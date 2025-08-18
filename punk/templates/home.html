@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block content %}
+<div id="main">
+    <h1>PunkChat</h1>
+
+    <form id="home-form" action="/" method="post" enctype="multipart/form-data">
+        <label for="name">Name (optional, anon otherwise):</label>
+        <input type="text" name="name" id="name" value="{{ name or '' }}">
+        <br>
+
+        <label for="avatar">Profile Picture (optional, PNG/JPEG):</label>
+        <input type="file" name="avatar" id="avatar" accept="image/png,image/jpeg">
+        <br>
+
+        <label>Join a Room</label>
+        <input type="text" name="code" id="code" placeholder="Room code" value="{{ code or '' }}">
+        <button type="submit" name="join" id="join-button" value="join">Join</button>
+        <br>
+
+        <label>or Create a Room</label>
+        <button type="submit" name="create" value="create">Create</button>
+
+        <label class="inline">
+            <input type="checkbox" name="is_public" id="is_public"> Make public
+        </label>
+        <input type="text" name="title" id="title" placeholder="Public room title (optional)" style="max-width: 260px;">
+
+        {% if error %}
+        <p class="error">{{ error }}</p>
+        {% endif %}
+    </form>
+
+    <h2>Public rooms</h2>
+    <div id="public-rooms" class="room-list">
+        <em>Loading public rooms…</em>
+    </div>
+</div>
+
+<script>
+    function joinPublic(code) {
+        const codeInput = document.getElementById('code');
+        codeInput.value = code;
+        document.getElementById('join-button').click();
+    }
+
+    function renderPublicRooms(rooms) {
+        const container = document.getElementById('public-rooms');
+        if (!rooms.length) {
+            container.innerHTML = '<em>No public rooms yet. Be the first to create one.</em>';
+            return;
+        }
+        container.innerHTML = '';
+        rooms.forEach(r => {
+            const item = document.createElement('div');
+            item.className = 'room-item';
+            item.innerHTML = `
+                <div class="room-title"><strong>${r.title}</strong></div>
+                <div class="room-meta"><span>Code: ${r.code}</span> · <span>${r.members} online</span></div>
+                <button type="button" class="join-public" data-code="${r.code}">Join</button>
+            `;
+            item.querySelector('button.join-public').addEventListener('click', () => joinPublic(r.code));
+            container.appendChild(item);
+        });
+    }
+
+    async function fetchPublicRooms() {
+        try {
+            const res = await fetch('/api/public-rooms');
+            const data = await res.json();
+            renderPublicRooms(data.rooms || []);
+        } catch (e) {
+            console.log('[PublicRooms] fetch error', e);
+        }
+    }
+
+    fetchPublicRooms();
+    setInterval(fetchPublicRooms, 5000);
+</script>
+{% endblock %}

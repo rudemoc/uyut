@@ -1,0 +1,149 @@
+body {
+    background-color: #000000;
+    color: #ffffff;
+    font-family: 'Courier New', Courier, monospace;
+    margin: 0;
+    padding: 0;
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.2);
+}
+
+#main {
+    max-width: 90%;
+    margin: 20px auto;
+    padding: 15px;
+    border: 1px dashed #ffffff;
+}
+
+h1 {
+    text-align: center;
+    font-size: 1.5em;
+    letter-spacing: 2px;
+}
+
+#messages {
+    height: 50vh;
+    overflow-y: auto;
+    border: 1px solid #ffffff;
+    padding: 10px;
+    margin-bottom: 10px;
+    background: #111111;
+}
+
+.message {
+    margin-bottom: 10px;
+    word-break: break-word;
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.message .payload {
+    flex: 1;
+}
+
+.avatar {
+    width: 32px;
+    height: 32px;
+    margin-right: 10px;
+    border: 1px solid #cccccc;
+    filter: grayscale(100%);
+}
+
+em {
+    color: #cccccc;
+    font-style: italic;
+    display: block;
+    margin: 5px 0;
+    text-shadow: none;
+}
+
+input, button {
+    background-color: #222222;
+    color: #ffffff;
+    border: 1px solid #ffffff;
+    padding: 5px;
+    font-family: inherit;
+}
+
+button:hover {
+    background-color: #444444;
+}
+
+.error {
+    color: #ff0000;
+}
+
+/* Public rooms */
+.room-list {
+    margin-top: 10px;
+    border: 1px solid #ffffff;
+    padding: 10px;
+    background: #111111;
+}
+
+.room-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border: 1px dashed #ffffff;
+    padding: 8px;
+    margin-bottom: 8px;
+    gap: 10px;
+}
+
+.room-title {
+    letter-spacing: 1px;
+}
+
+.room-meta {
+    color: #cccccc;
+    margin-left: 10px;
+    margin-right: auto;
+}
+
+.join-public {
+    background-color: #222222;
+    color: #ffffff;
+    border: 1px solid #ffffff;
+    padding: 5px 8px;
+}
+
+.join-public:hover {
+    background-color: #444444;
+}
+
+/* Media previews */
+.message img.inline-image {
+    max-width: 260px;
+    border: 1px solid #333;
+}
+
+.message video {
+    max-width: 420px;
+    width: 100%;
+    height: auto;
+    border: 1px solid #333;
+    background: #000;
+}
+
+@media (max-width: 600px) {
+    #main {
+        padding: 10px;
+    }
+    h1 {
+        font-size: 1.2em;
+    }
+    #messages {
+        height: 60vh;
+    }
+    .avatar {
+        width: 24px;
+        height: 24px;
+        margin-right: 5px;
+    }
+    .room-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+}

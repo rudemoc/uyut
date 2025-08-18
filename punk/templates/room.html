@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block content %}
+<div id="main">
+    <h1>{{ title }} <small>({{ room }})</small></h1>
+    <div id="messages"></div>
+    <form id="send-container" enctype="multipart/form-data">
+        <input type="text" id="message-input" placeholder="Type message...">
+        <input type="file" id="file-input" name="file"
+               accept="image/*,video/*,.gif,.zip,.pdf,.txt,.doc,.docx,.xlsx,.ppt,.pptx">
+        <button type="submit" id="send-button">Send</button>
+    </form>
+</div>
+
+<script>
+    const socket = io();
+    const messagesDiv = document.getElementById('messages');
+    const initialMessages = {{ messages | tojson | safe }};
+    initialMessages.forEach(addMessage);
+
+    socket.on('connect', () => console.log('[Debug] WebSocket connected'));
+    socket.on('message', addMessage);
+
+    async function uploadFile(file) {
+        const fd = new FormData();
+        fd.append('file', file);
+        const res = await fetch('/upload', { method: 'POST', body: fd });
+        if (!res.ok) throw new Error('Upload failed');
+        return await res.json(); // {kind, name, type, url}
+    }
+
+    document.getElementById('send-container').addEventListener('submit', async e => {
+        e.preventDefault();
+        const input = document.getElementById('message-input');
+        const fileInput = document.getElementById('file-input');
+        const messageText = input.value.trim();
+
+        let fileMeta = null;
+        if (fileInput.files.length > 0) {
+            try {
+                fileMeta = await uploadFile(fileInput.files[0]);
+            } catch (err) {
+                console.log('[Upload] error', err);
+                alert('Upload failed');
+                return;
+            }
+        }
+
+        if (messageText || fileMeta) {
+            socket.emit('message', { message: messageText, file: fileMeta });
+        }
+
+        input.value = '';
+        fileInput.value = '';
+    });
+
+    function addMessage(msg) {
+        if (!msg || (!msg.sender && msg.sender !== '' && msg.sender !== 'System') || (!msg.message && !msg.file)) {
+            console.log('[Debug] Skipping invalid message:', msg);
+            return;
+        }
+        const msgElem = document.createElement('div');
+        msgElem.classList.add('message');
+
+        const avatar = msg.avatar ? `data:image/png;base64,${msg.avatar}` : 'data:image/png;base64,{{ default_avatar }}';
+
+        const left = document.createElement('img');
+        left.className = 'avatar';
+        left.src = avatar;
+
+        const payload = document.createElement('div');
+        payload.className = 'payload';
+
+        if (msg.sender === 'System') {
+            payload.innerHTML = `<em>${msg.message || ''}</em>`;
+        } else {
+            const header = `<strong>${msg.sender}:</strong> ${msg.message ? msg.message : ''}`;
+            payload.innerHTML = header;
+
+            if (msg.file) {
+                const f = msg.file;
+                if (f.kind === 'video') {
+                    const v = document.createElement('video');
+                    v.controls = true;
+                    v.preload = 'metadata';
+                    v.src = f.url;
+                    payload.appendChild(document.createElement('br'));
+                    payload.appendChild(v);
+                } else if (f.kind === 'image') {
+                    const img = document.createElement('img');
+                    img.src = f.url;
+                    img.className = 'inline-image';
+                    payload.appendChild(document.createElement('br'));
+                    payload.appendChild(img);
+                } else if (f.kind === 'file') {
+                    const a = document.createElement('a');
+                    a.href = f.url;
+                    a.download = f.name;
+                    a.textContent = f.name;
+                    payload.appendChild(document.createElement('br'));
+                    payload.appendChild(a);
+                }
+            }
+        }
+
+        msgElem.appendChild(left);
+        msgElem.appendChild(payload);
+        messagesDiv.appendChild(msgElem);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+</script>
+{% endblock %}
