@@ -1,3 +1,4 @@
+# main.py
 import os
 import json
 import re
@@ -25,6 +26,9 @@ rooms = {}            # In-memory state
 default_avatar = None # base64 default image
 
 STORAGE_FILE = "rooms.json"
+
+# ----- File size limit -----
+MAX_UPLOAD_SIZE = 400 * 1024 * 1024  # 400 MB
 
 # ----- Default avatar -----
 def create_default_avatar():
@@ -171,12 +175,23 @@ def upload():
     if not room_code or not name or room_code not in rooms:
         return jsonify({'error': 'Not in a room'}), 400
 
+    # Check request size
+    if request.content_length > MAX_UPLOAD_SIZE:
+        return jsonify({'error': 'Request too large'}), 400
+
     if 'file' not in request.files:
         return jsonify({'error': 'No file'}), 400
 
     file = request.files['file']
     if file.filename == '':
         return jsonify({'error': 'Empty filename'}), 400
+
+    # Check file size
+    file.seek(0, os.SEEK_END)
+    file_length = file.tell()
+    file.seek(0)  # reset pointer
+    if file_length > MAX_UPLOAD_SIZE:
+        return jsonify({'error': 'File too large'}), 400
 
     filename = safe_filename(file.filename)
     mimetype = file.mimetype or mimetypes.guess_type(filename)[0] or 'application/octet-stream'
@@ -192,6 +207,8 @@ def upload():
         return jsonify(meta)
     elif mimetype.startswith('image/'):
         return jsonify({'kind': 'image', 'name': unique, 'type': mimetype, 'url': url})
+    elif mimetype.startswith('audio/'):
+        return jsonify({'kind': 'audio', 'name': unique, 'type': mimetype, 'url': url})
     else:
         return jsonify({'kind': 'file', 'name': unique, 'type': mimetype, 'url': url})
 
