@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="notifications-container">
+    <div class="header">
+        <h1>Уведомления и чаты</h1>
+        <p class="tagline">Ваши сообщения и активность</p>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-button active" data-tab="notifications">Уведомления</button>
+        <button class="tab-button" data-tab="chats">Недавние чаты</button>
+    </div>
+
+    <div id="notifications-tab" class="tab-content">
+        <h3 style="color: #d9d9d9; margin-bottom: 15px;">Новые уведомления</h3>
+        <div id="notifications-list">
+            <div class="empty-state">Загрузка уведомлений...</div>
+        </div>
+    </div>
+
+    <div id="chats-tab" class="tab-content hidden">
+        <h3 style="color: #d9d9d9; margin-bottom: 15px;">Ваши чаты</h3>
+        <div id="recent-chats-list">
+            <div class="empty-state">Загрузка чатов...</div>
+        </div>
+    </div>
+
+    <div style="margin-top: 30px; text-align: center;">
+        <a href="{{ url_for('home') }}" class="back-button">← На главную</a>
+    </div>
+</div>
+
+<style>
+.notifications-container {
+    max-width: 600px;
+    margin: 20px auto;
+    padding: 0 15px;
+}
+
+.tabs {
+    display: flex;
+    border-bottom: 1px solid #38444d;
+    margin-bottom: 20px;
+}
+
+.tab-button {
+    background: none;
+    border: none;
+    color: #8899a6;
+    padding: 12px 24px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    font-size: 1em;
+    transition: all 0.2s ease;
+}
+
+.tab-button.active {
+    color: #19cf86;
+    border-bottom-color: #19cf86;
+}
+
+.tab-button:hover {
+    color: #d9d9d9;
+}
+
+.tab-content {
+    padding: 20px 0;
+}
+
+.notification-item, .chat-item {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    border-bottom: 1px solid #38444d;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    border-radius: 8px;
+    margin-bottom: 8px;
+}
+
+.notification-item:hover, .chat-item:hover {
+    background: #253341;
+}
+
+.notification-avatar, .chat-item .avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    margin-right: 15px;
+    flex-shrink: 0;
+}
+
+.notification-content, .chat-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.notification-text, .chat-name {
+    color: #d9d9d9;
+    font-weight: bold;
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.chat-preview {
+    color: #8899a6;
+    font-size: 0.9em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.notification-time, .chat-time {
+    color: #8899a6;
+    font-size: 0.8em;
+    flex-shrink: 0;
+    margin-left: 10px;
+}
+
+.empty-state {
+    text-align: center;
+    color: #8899a6;
+    padding: 40px 20px;
+    font-style: italic;
+}
+
+.back-button {
+    color: #19cf86;
+    text-decoration: none;
+    padding: 10px 20px;
+    border: 1px solid #38444d;
+    border-radius: 20px;
+    display: inline-block;
+    transition: all 0.2s ease;
+}
+
+.back-button:hover {
+    background: #253341;
+}
+
+@media (max-width: 800px) {
+    .notifications-container {
+        padding: 0 10px;
+    }
+    
+    .notification-item, .chat-item {
+        padding: 12px;
+    }
+    
+    .tab-button {
+        padding: 10px 16px;
+        font-size: 0.9em;
+    }
+}
+</style>
+{% endblock %}

@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block content %}
+<div id="main">
+    <div class="header">
+        <h1>Ошибка</h1>
+    </div>
+
+    <div class="error-container" style="text-align: center; padding: 40px 20px;">
+        <div style="font-size: 4em; margin-bottom: 20px;">😕</div>
+        <h2 style="color: #d9d9d9; margin-bottom: 15px;">{{ error }}</h2>
+        <p style="color: #8899a6; margin-bottom: 30px;">
+            Что-то пошло не так. Попробуйте вернуться на главную страницу.
+        </p>
+        
+        <div style="display: flex; gap: 15px; justify-content: center;">
+            <a href="{{ url_for('home') }}" class="back-button" style="background: #19cf86; color: #15202b; text-decoration: none; padding: 12px 24px; border-radius: 20px; font-weight: bold;">
+                На главную
+            </a>
+            <a href="javascript:history.back()" class="back-button" style="background: #38444d; color: #d9d9d9; text-decoration: none; padding: 12px 24px; border-radius: 20px; font-weight: bold;">
+                Назад
+            </a>
+        </div>
+    </div>
+</div>
+
+<style>
+.back-button:hover {
+    opacity: 0.9;
+    transform: translateY(-2px);
+    transition: all 0.2s ease;
+}
+
+@media (max-width: 800px) {
+    .error-container div {
+        flex-direction: column;
+    }
+    
+    .back-button {
+        width: 100%;
+        text-align: center;
+    }
+}
+</style>
+{% endblock %}

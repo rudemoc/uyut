@@ -1,14 +1,30 @@
-<!-- room.html -->
 {% extends "base.html" %}
 {% block content %}
-{{ super() }}
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <div id="main">
+    <script type="application/json" id="room-messages-data">
+        {{ messages | tojson | safe }}
+    </script>
+    <div id="room-data" 
+         data-default-avatar="{{ default_avatar }}"
+         data-user-id="{{ user.id }}"
+         data-user-name="{{ user.display_name }}"
+         data-user-avatar="{{ user.avatar }}"
+         style="display: none;">
+    </div>
     
     <div id="header">
         <h1>{{ title }} <small style="color: #8899a6;">({{ room }})</small></h1>
+        <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 5px;">
+            <img src="data:image/png;base64,{{ user.avatar }}" class="avatar" style="width: 24px; height: 24px;">
+            <span style="color: #8899a6; font-size: 0.9em;">{{ user.display_name }}</span>
+            <a href="{{ url_for('profile') }}" style="color: #19cf86; font-size: 0.8em; margin-left: 10px;">Профиль</a>
+            <a href="{{ url_for('home') }}" style="color: #19cf86; font-size: 0.8em; margin-left: 10px;">Главная</a>
+        </div>
     </div>
+    
     <div id="messages"></div>
+    
     <form id="send-container" enctype="multipart/form-data">
         <div class="editor-toolbar">
             <button type="button" id="bold-btn"><strong>B</strong></button>
@@ -54,373 +70,39 @@
         </div>
         <div class="resizer-top"></div>
         <div id="message-editor" contenteditable="true" data-placeholder="What's happening?"></div>
-        <button type="submit" id="send-button">Post</button>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+            <span id="char-counter" style="color: #8899a6; font-size: 0.8em;">0/512</span>
+            <button type="submit" id="send-button">Post</button>
+        </div>
     </form>
+    
     <div id="image-viewer" class="image-viewer hidden">
         <div class="image-viewer-content">
             <img id="viewer-image" src="" alt="Full-size image">
             <button id="close-viewer" class="close-button">✕</button>
         </div>
     </div>
+    
     <div id="cooldown-overlay" class="cooldown-overlay hidden">
         <div class="cooldown-timer">
-            <span id="cooldown-seconds">3</span> seconds until you can post again
+            <span id="cooldown-seconds">1</span> second until you can post again
             <div class="cooldown-progress"></div>
         </div>
     </div>
 </div>
 
-<script>
-    const socket = io();
-    const messagesDiv = document.getElementById('messages');
-    const initialMessages = {{ messages | tojson | safe }};
-    const imageViewer = document.getElementById('image-viewer');
-    const viewerImage = document.getElementById('viewer-image');
-    const closeViewerButton = document.getElementById('close-viewer');
-    const editor = document.getElementById('message-editor');
-    const boldBtn = document.getElementById('bold-btn');
-    const italicBtn = document.getElementById('italic-btn');
-    const sizeSelect = document.getElementById('size-select');
-    const emojiBtn = document.getElementById('emoji-btn');
-    const emojiPicker = document.getElementById('emoji-picker');
-    const closeEmojiPicker = document.getElementById('close-emoji-picker');
-    const fileInput = document.getElementById('file-input');
-    const resizerTop = document.querySelector('.resizer-top');
-    
-    // Cooldown variables
-    let cooldownTime = 3000; // 3 seconds base cooldown
-    let currentCooldown = 0;
-    let cooldownTimer = null;
-    let spamCount = 0;
-    const MAX_COOLDOWN = 30000; // 30 seconds maximum
+<style>
+#char-counter {
+    padding: 0 10px;
+}
 
-    // --- Resize state ---
-    let isResizing = false;
-    let startY, startHeight;
+.message .avatar {
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
 
-    // --- Zoom + Drag state ---
-    let zoomScale = 1;
-    let translateX = 0, translateY = 0;
-    let isDragging = false;
-    let dragStartX = 0, dragStartY = 0;
-
-    const ZOOM_STEP = 0.1;
-    const MAX_ZOOM = 5;
-    const MIN_ZOOM = 0.5;
-
-    function updateTransform() {
-        viewerImage.style.transform =
-            `translate(${translateX}px, ${translateY}px) scale(${zoomScale})`;
-    }
-
-    // Function to add message with conditional smooth scroll and image click handler
-    function addMessage(msg) {
-        if (!msg || (!msg.sender && msg.sender !== '' && msg.sender !== 'System') || (!msg.message && !msg.file)) {
-            console.log('[Debug] Skipping invalid message:', msg);
-            return;
-        }
-        const wasAtBottom = messagesDiv.scrollTop + messagesDiv.clientHeight >= messagesDiv.scrollHeight - 1;
-
-        const msgElem = document.createElement('div');
-        msgElem.classList.add('message');
-
-        const avatar = msg.avatar ? `data:image/png;base64,${msg.avatar}` : 'data:image/png;base64,{{ default_avatar }}';
-
-        const left = document.createElement('img');
-        left.className = 'avatar';
-        left.src = avatar;
-
-        const payload = document.createElement('div');
-        payload.className = 'payload';
-
-        if (msg.sender === 'System') {
-            payload.innerHTML = `<em>${msg.message || ''}</em>`;
-        } else {
-            const header = `<strong style="color: #d9d9d9;">${msg.sender}</strong> <span style="color: #8899a6;">@${msg.sender.replace(/[^A-Za-z0-9_]/g, '')}</span><br>`;
-            payload.innerHTML = header + (msg.message ? msg.message : '');
-        }
-
-        msgElem.appendChild(left);
-        msgElem.appendChild(payload);
-        messagesDiv.appendChild(msgElem);
-
-        // Attach click handlers to any inline images in the new message
-        payload.querySelectorAll('img.inline-image').forEach(img => {
-            img.addEventListener('click', () => {
-                viewerImage.src = img.src;
-                imageViewer.classList.remove('hidden');
-                zoomScale = 1;
-                translateX = 0;
-                translateY = 0;
-                updateTransform();
-                viewerImage.style.cursor = 'default';
-            });
-        });
-
-        if (wasAtBottom) {
-            messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
-        }
-    }
-
-    // Add initial messages without scrolling each time
-    initialMessages.forEach(msg => {
-        addMessage(msg);
-    });
-    // Force scroll to bottom after initial load
-    messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior: 'smooth' });
-
-    socket.on('connect', () => console.log('[Debug] WebSocket connected'));
-    socket.on('message', addMessage);
-
-    // File size formatting helper
-    function formatFileSize(bytes) {
-        if (bytes < 1024) return bytes + ' B';
-        if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-        return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-    }
-
-    async function uploadFile(file) {
-        const maxSize = 400 * 1024 * 1024; // 400 MB in bytes
-        
-        // Check file size
-        if (file.size > maxSize) {
-            throw new Error(`File "${file.name}" is too large. Maximum file size is 400 MB.`);
-        }
-
-        const fd = new FormData();
-        fd.append('file', file);
-        const res = await fetch('/upload', { method: 'POST', body: fd });
-        if (!res.ok) throw new Error('Upload failed');
-        return await res.json(); // {kind, name, type, url}
-    }
-
-    // Handle multiple file uploads and insert into editor
-    fileInput.addEventListener('change', async () => {
-        const files = Array.from(fileInput.files);
-        if (files.length === 0) return;
-        
-        const maxSize = 400 * 1024 * 1024; // 400 MB in bytes
-        
-        // Check each file size
-        for (const file of files) {
-            if (file.size > maxSize) {
-                alert(`File "${file.name}" is too large. Maximum file size is 400 MB.`);
-                fileInput.value = '';
-                return;
-            }
-        }
-        
-        // Check total size
-        const totalSize = files.reduce((acc, file) => acc + file.size, 0);
-        if (totalSize > maxSize) {
-            alert(`Total files size exceeds 400 MB. Please select fewer files.`);
-            fileInput.value = '';
-            return;
-        }
-        
-        try {
-            const metas = await Promise.all(files.map(uploadFile));
-            metas.forEach((meta, index) => {
-                const file = files[index];
-                let insertHtml = '';
-                const sizeInfo = `<div class="file-size">${formatFileSize(file.size)}</div>`;
-                
-                if (meta.kind === 'image') {
-                    insertHtml = `<div><img src="${meta.url}" alt="${meta.name}" class="inline-image" style="max-width:auto; height:auto;">${sizeInfo}</div>`;
-                } else if (meta.kind === 'video') {
-                    insertHtml = `<div><video src="${meta.url}" controls preload="metadata" style="max-width:auto; height:auto;"></video>${sizeInfo}</div>`;
-                } else if (meta.kind === 'audio') {
-                    insertHtml = `<div><audio src="${meta.url}" controls preload="metadata"></audio>${sizeInfo}</div>`;
-                } else if (meta.kind === 'file') {
-                    insertHtml = `<div><a href="${meta.url}" download="${meta.name}" style="color: #19cf86;">${meta.name}</a>${sizeInfo}</div>`;
-                }
-                if (insertHtml) {
-                    editor.focus();
-                    document.execCommand('insertHTML', false, insertHtml + ' ');
-                }
-            });
-            fileInput.value = '';
-        } catch (err) {
-            console.log('[Upload] error', err);
-            alert(err.message || 'Upload failed');
-        }
-    });
-
-    // Cooldown functions
-    function startCooldown() {
-        // Show cooldown overlay
-        const overlay = document.getElementById('cooldown-overlay');
-        const secondsSpan = document.getElementById('cooldown-seconds');
-        const progress = document.querySelector('.cooldown-progress');
-        
-        overlay.classList.remove('hidden');
-        secondsSpan.textContent = (cooldownTime / 1000).toFixed(1);
-        
-        // Reset and animate progress bar
-        progress.style.animation = 'none';
-        setTimeout(() => {
-            progress.style.animation = `cooldown-progress ${cooldownTime}ms linear`;
-        }, 10);
-        
-        // Update timer text
-        currentCooldown = cooldownTime;
-        if (cooldownTimer) clearInterval(cooldownTimer);
-        
-        cooldownTimer = setInterval(() => {
-            currentCooldown -= 1000;
-            if (currentCooldown <= 0) {
-                clearInterval(cooldownTimer);
-                overlay.classList.add('hidden');
-                spamCount = Math.max(0, spamCount - 1); // Reduce spam count over time
-                cooldownTime = Math.max(3000, cooldownTime / 2); // Reduce cooldown
-            } else {
-                secondsSpan.textContent = (currentCooldown / 1000).toFixed(1);
-            }
-        }, 1000);
-        
-        // Increase cooldown for next time if user is spamming
-        spamCount++;
-        if (spamCount > 2) {
-            cooldownTime = Math.min(MAX_COOLDOWN, cooldownTime * 2);
-        }
-    }
-
-    // Toolbar functionality
-    boldBtn.addEventListener('click', () => {
-        editor.focus();
-        document.execCommand('bold');
-    });
-
-    italicBtn.addEventListener('click', () => {
-        editor.focus();
-        document.execCommand('italic');
-    });
-
-    sizeSelect.addEventListener('change', () => {
-        const size = sizeSelect.value;
-        if (size) {
-            editor.focus();
-            document.execCommand('fontSize', false, size);
-            sizeSelect.value = ''; // Reset select
-        }
-    });
-
-    emojiBtn.addEventListener('click', () => {
-        emojiPicker.classList.toggle('hidden');
-    });
-
-    // Allow multiple emoji selections
-    emojiPicker.querySelectorAll('.emoji').forEach(emoji => {
-        emoji.addEventListener('click', () => {
-            editor.focus();
-            document.execCommand('insertText', false, emoji.textContent);
-            // Keep picker open for multiple selections
-        });
-    });
-
-    // Close emoji picker
-    closeEmojiPicker.addEventListener('click', () => {
-        emojiPicker.classList.add('hidden');
-    });
-
-    // Close emoji picker if clicking outside
-    document.addEventListener('click', (e) => {
-        if (!emojiBtn.contains(e.target) && !emojiPicker.contains(e.target)) {
-            emojiPicker.classList.add('hidden');
-        }
-    });
-
-    document.getElementById('send-container').addEventListener('submit', e => {
-        e.preventDefault();
-        
-        // Check if in cooldown
-        if (currentCooldown > 0) {
-            return;
-        }
-        
-        const messageHTML = editor.innerHTML.trim();
-        if (messageHTML) {
-            socket.emit('message', { message: messageHTML });
-            editor.innerHTML = '';
-            startCooldown(); // Start cooldown after sending
-        }
-    });
-
-    // Custom top resizer for editor
-    resizerTop.addEventListener('mousedown', e => {
-        isResizing = true;
-        startY = e.clientY;
-        startHeight = editor.offsetHeight;
-        e.preventDefault();
-    });
-
-    window.addEventListener('mousemove', e => {
-        if (!isResizing) return;
-        const delta = startY - e.clientY;
-        const newHeight = startHeight + delta;
-        editor.style.height = `${Math.max(40, Math.min(300, newHeight))}px`;
-    });
-
-    window.addEventListener('mouseup', () => {
-        isResizing = false;
-    });
-
-    // --- Image Viewer: Zoom (wheel) + Drag to Move ---
-    imageViewer.addEventListener('wheel', e => {
-        if (!viewerImage.src) return;
-        e.preventDefault();
-
-        // basic zoom centered on image; Twitter-like step
-        if (e.deltaY < 0) {
-            zoomScale = Math.min(MAX_ZOOM, zoomScale + ZOOM_STEP);
-        } else {
-            zoomScale = Math.max(MIN_ZOOM, zoomScale - ZOOM_STEP);
-        }
-
-        // cursor hint
-        viewerImage.style.cursor = zoomScale > 1 ? (isDragging ? 'grabbing' : 'grab') : 'default';
-        updateTransform();
-    }, { passive: false });
-
-    viewerImage.addEventListener('mousedown', e => {
-        if (zoomScale <= 1 || e.button !== 0) return; // left click only
-        isDragging = true;
-        dragStartX = e.clientX - translateX;
-        dragStartY = e.clientY - translateY;
-        viewerImage.style.cursor = 'grabbing';
-    });
-
-    window.addEventListener('mousemove', e => {
-        if (!isDragging) return;
-        translateX = e.clientX - dragStartX;
-        translateY = e.clientY - dragStartY;
-        updateTransform();
-    });
-
-    window.addEventListener('mouseup', e => {
-        if (e.button !== 0) return;
-        if (isDragging) {
-            isDragging = false;
-            viewerImage.style.cursor = zoomScale > 1 ? 'grab' : 'default';
-        }
-    });
-
-    // Image viewer close handlers
-    function resetViewer() {
-        imageViewer.classList.add('hidden');
-        viewerImage.src = '';
-        zoomScale = 1;
-        translateX = 0;
-        translateY = 0;
-        updateTransform();
-        viewerImage.style.cursor = 'default';
-    }
-
-    closeViewerButton.addEventListener('click', resetViewer);
-    imageViewer.addEventListener('click', (e) => {
-        if (e.target === imageViewer) {
-            resetViewer();
-        }
-    });
-</script>
+.message .avatar:hover {
+    opacity: 0.8;
+}
+</style>
 {% endblock %}

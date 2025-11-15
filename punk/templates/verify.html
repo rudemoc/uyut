@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% block content %}
+<div id="main">
+    <div class="header">
+        <h1>NIKTOONION</h1>
+        <p class="tagline">Завершение регистрации</p>
+    </div>
+
+    <form method="post" class="form-container">
+        <div class="form-group">
+            <label for="code">Код из email:</label>
+            <input type="text" name="code" id="code" 
+                   placeholder="Введите 6 цифр" 
+                   required
+                   pattern="[0-9]{6}"
+                   maxlength="6"
+                   style="background-color: #253341; color: #d9d9d9; border: 1px solid #38444d; padding: 12px; border-radius: 8px; width: 100%; font-size: 18px; text-align: center; letter-spacing: 2px;">
+        </div>
+
+        <div class="form-group">
+            <label for="username">Имя пользователя:</label>
+            <input type="text" name="username" id="username" 
+                   placeholder="Придумайте уникальное имя" 
+                   required
+                   minlength="2" 
+                   maxlength="20"
+                   style="background-color: #253341; color: #d9d9d9; border: 1px solid #38444d; padding: 12px; border-radius: 8px; width: 100%; font-size: 16px;">
+            <small style="color: #8899a6;">От 2 до 20 символов (только буквы, цифры и _)</small>
+        </div>
+
+        <div class="form-group">
+            <label for="password">Пароль:</label>
+            <input type="password" name="password" id="password" 
+                   placeholder="Придумайте надежный пароль" 
+                   required
+                   minlength="6"
+                   style="background-color: #253341; color: #d9d9d9; border: 1px solid #38444d; padding: 12px; border-radius: 8px; width: 100%; font-size: 16px;">
+            <small style="color: #8899a6;">Минимум 6 символов</small>
+        </div>
+
+        <div class="form-group">
+            <label for="password_confirm">Подтверждение пароля:</label>
+            <input type="password" name="password_confirm" id="password_confirm" 
+                   placeholder="Повторите пароль" 
+                   required
+                   minlength="6"
+                   style="background-color: #253341; color: #d9d9d9; border: 1px solid #38444d; padding: 12px; border-radius: 8px; width: 100%; font-size: 16px;">
+        </div>
+
+        {% if error %}
+        <div class="error-message" style="color: #e0245e; background: #2d1a23; padding: 12px; border-radius: 8px; border: 1px solid #e0245e; margin: 10px 0;">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <button type="submit" class="submit-button" style="background-color: #19cf86; color: #15202b; border: none; padding: 12px 24px; border-radius: 20px; font-weight: bold; width: 100%; cursor: pointer; font-size: 1em; margin-top: 15px;">
+            Завершить регистрацию
+        </button>
+    </form>
+
+    <div class="auth-info" style="margin-top: 30px; padding: 20px; background: #253341; border-radius: 16px; border: 1px solid #38444d; text-align: center;">
+        <p style="color: #8899a6; margin: 0;">
+            Код действителен 5 минут<br>
+            <a href="{{ url_for('auth_required') }}" style="color: #19cf86; text-decoration: none;">Отправить код заново</a>
+        </p>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const codeInput = document.getElementById('code');
+    const usernameInput = document.getElementById('username');
+    const passwordInput = document.getElementById('password');
+    const passwordConfirmInput = document.getElementById('password_confirm');
+    
+    // Автофокус на поле кода
+    if (codeInput) {
+        codeInput.focus();
+        
+        // Автопереход при вводе 6 цифр
+        codeInput.addEventListener('input', function(e) {
+            // Оставляем только цифры
+            e.target.value = e.target.value.replace(/\D/g, '');
+            
+            // Автопереход к следующему полю при вводе 6 цифр
+            if (e.target.value.length === 6) {
+                if (usernameInput) {
+                    usernameInput.focus();
+                }
+            }
+        });
+    }
+
+    // Валидация имени пользователя
+    if (usernameInput) {
+        usernameInput.addEventListener('input', function(e) {
+            // Разрешаем только буквы, цифры и подчеркивания
+            e.target.value = e.target.value.replace(/[^a-zA-Z0-9_]/g, '');
+        });
+    }
+
+    // Проверка совпадения паролей
+    function validatePasswords() {
+        if (passwordInput.value && passwordConfirmInput.value) {
+            if (passwordInput.value !== passwordConfirmInput.value) {
+                passwordConfirmInput.style.borderColor = '#e0245e';
+            } else {
+                passwordConfirmInput.style.borderColor = '#19cf86';
+            }
+        }
+    }
+
+    if (passwordInput && passwordConfirmInput) {
+        passwordInput.addEventListener('input', validatePasswords);
+        passwordConfirmInput.addEventListener('input', validatePasswords);
+    }
+    
+    // Очистка ошибки при изменении ввода
+    const inputs = document.querySelectorAll('input');
+    inputs.forEach(input => {
+        input.addEventListener('input', function() {
+            const errorElement = document.querySelector('.error-message');
+            if (errorElement) {
+                errorElement.style.display = 'none';
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

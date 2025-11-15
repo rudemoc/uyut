@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block content %}
+<div id="main">
+    <div class="header">
+        <h1>Профиль пользователя</h1>
+    </div>
+
+    <div class="profile-container">
+        <div class="profile-header">
+            <div class="avatar-section">
+                <img src="data:image/png;base64,{{ user.avatar }}" 
+                     class="avatar" style="width: 120px; height: 120px;">
+            </div>
+            <div class="profile-info">
+                <h2 style="margin: 0; color: #d9d9d9;">{{ user.display_name }}</h2>
+                <p style="margin: 5px 0; color: #8899a6;">@{{ user.username }}</p>
+                <p style="margin: 0; color: #8899a6; font-size: 0.9em;">
+                    На сайте с {{ user.created_at | datetime }}
+                </p>
+                
+                <div class="profile-actions" style="margin-top: 15px;">
+                    <!-- ВСЕГДА используем direct_message для гарантированного перехода в личный чат -->
+                    <a href="{{ url_for('direct_message', user_id=user.id) }}" 
+                       class="message-button" 
+                       style="background-color: #19cf86; color: #15202b; text-decoration: none; padding: 10px 20px; border-radius: 20px; font-weight: bold; display: inline-block; transition: all 0.2s ease;">
+                        💬 Написать сообщение
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        {% if user.bio %}
+        <div class="profile-section">
+            <h3 style="color: #d9d9d9; margin-bottom: 10px;">О себе</h3>
+            <p style="color: #d9d9d9; margin: 0; line-height: 1.5;">{{ user.bio }}</p>
+        </div>
+        {% endif %}
+
+        <div class="profile-section">
+            <h3 style="color: #d9d9d9; margin-bottom: 10px;">Активность</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; color: #8899a6;">
+                <div>
+                    <strong>Последний раз онлайн:</strong><br>
+                    {{ user.last_seen | time_ago }}
+                </div>
+                <div>
+                    <strong>Зарегистрирован:</strong><br>
+                    {{ user.created_at | datetime }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="profile-actions" style="margin-top: 30px; display: flex; gap: 10px;">
+        <a href="{{ url_for('home') }}" class="back-button">← На главную</a>
+        <a href="javascript:history.back()" class="back-button">Назад</a>
+    </div>
+</div>
+
+<style>
+.profile-container {
+    background: #253341;
+    border-radius: 16px;
+    border: 1px solid #38444d;
+    padding: 25px;
+    margin-bottom: 20px;
+}
+
+.profile-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 25px;
+    margin-bottom: 25px;
+}
+
+.avatar-section {
+    flex-shrink: 0;
+}
+
+.profile-info {
+    flex: 1;
+}
+
+.profile-section {
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #38444d;
+}
+
+.profile-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.back-button {
+    color: #19cf86;
+    text-decoration: none;
+    padding: 10px 20px;
+    border: 1px solid #38444d;
+    border-radius: 20px;
+    display: inline-block;
+    text-align: center;
+    flex: 1;
+    transition: all 0.2s ease;
+}
+
+.back-button:hover {
+    background: #253341;
+}
+
+.message-button:hover {
+    background-color: #16b677 !important;
+    transform: translateY(-2px);
+}
+
+@media (max-width: 800px) {
+    .profile-header {
+        flex-direction: column;
+        text-align: center;
+        gap: 15px;
+    }
+    
+    .profile-actions {
+        flex-direction: column;
+    }
+    
+    .back-button {
+        width: 100%;
+    }
+    
+    .profile-container {
+        padding: 20px 15px;
+    }
+}
+</style>
+{% endblock %}

@@ -1,13 +1,42 @@
-<!-- base.html -->
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>niktoonion</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles/style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
 </head>
 <body>
+    {% if request.endpoint != 'room' %}
+    <nav class="main-nav">
+        <div class="nav-container">
+            <a href="{{ url_for('home') }}" class="nav-brand">NIKTOONION</a>
+            <div class="nav-links">
+                <a href="{{ url_for('home') }}" class="nav-link">🏠 Главная</a>
+                <a href="{{ url_for('notifications_page') }}" class="nav-link">🔔 Уведомления</a>
+                <a href="{{ url_for('profile') }}" class="nav-link">👤 Профиль</a>
+            </div>
+        </div>
+    </nav>
+    {% endif %}
+    
     {% block content %}{% endblock %}
+    
+    <!-- Глобальные переменные для JavaScript -->
+    <script>
+        const defaultAvatar = '{{ default_avatar }}';
+        const currentUserId = '{{ session.get("user_id", "") }}';
+    </script>
+    
+    {% if request.endpoint == 'home' %}
+        <script src="{{ url_for('static', filename='home.js') }}"></script>
+    {% elif request.endpoint == 'room' %}
+        <script src="{{ url_for('static', filename='room.js') }}"></script>
+    {% elif request.endpoint in ['auth_required', 'verify_code', 'login'] %}
+        <script src="{{ url_for('static', filename='auth.js') }}"></script>
+    {% elif request.endpoint == 'notifications_page' %}
+        <script src="{{ url_for('static', filename='notifications.js') }}"></script>
+    {% endif %}
 </body>
 </html>

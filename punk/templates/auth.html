@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block content %}
+<div id="main">
+    <div class="header">
+        <h1>NIKTOONION</h1>
+        <p class="tagline">Регистрация через email</p>
+    </div>
+
+    <form method="post" class="form-container">
+        <div class="form-group">
+            <label for="email">Email адрес:</label>
+            <input type="email" name="email" id="email" 
+                   placeholder="your@email.com" 
+                   required
+                   style="background-color: #253341; color: #d9d9d9; border: 1px solid #38444d; padding: 12px; border-radius: 8px; width: 100%; font-size: 16px;">
+            <small style="color: #8899a6; display: block; margin-top: 8px;">
+                На этот email будет отправлен код подтверждения
+            </small>
+        </div>
+
+        {% if error %}
+        <div class="error-message" style="color: #e0245e; background: #2d1a23; padding: 12px; border-radius: 8px; border: 1px solid #e0245e; margin: 10px 0;">
+            {{ error }}
+        </div>
+        {% endif %}
+
+        <button type="submit" class="submit-button" style="background-color: #19cf86; color: #15202b; border: none; padding: 12px 24px; border-radius: 20px; font-weight: bold; width: 100%; cursor: pointer; font-size: 1em; margin-top: 15px;">
+            Получить код подтверждения
+        </button>
+    </form>
+
+    <div class="auth-links" style="margin-top: 20px; text-align: center;">
+        <p style="color: #8899a6;">
+            Уже есть аккаунт? 
+            <a href="{{ url_for('login') }}" style="color: #19cf86; text-decoration: none;">Войти</a>
+        </p>
+    </div>
+
+    <div class="auth-info" style="margin-top: 30px; padding: 20px; background: #253341; border-radius: 16px; border: 1px solid #38444d; text-align: center;">
+        <p style="color: #8899a6; margin: 0;">
+            Код подтверждения будет отправлен на ваш email<br>
+            <small>Для тестирования код будет показан в консоли сервера</small>
+        </p>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const emailInput = document.getElementById('email');
+    
+    // Автофокус на поле ввода
+    if (emailInput) {
+        emailInput.focus();
+        
+        // Очистка ошибки при изменении ввода
+        emailInput.addEventListener('input', function() {
+            const errorElement = document.querySelector('.error-message');
+            if (errorElement) {
+                errorElement.style.display = 'none';
+            }
+        });
+    }
+
+    // Обработка отправки формы
+    const form = document.querySelector('form');
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            const submitButton = this.querySelector('button[type="submit"]');
+            if (submitButton) {
+                submitButton.disabled = true;
+                submitButton.textContent = 'Отправка кода...';
+                
+                // Восстановление кнопки через 5 секунд на случай ошибки
+                setTimeout(() => {
+                    submitButton.disabled = false;
+                    submitButton.textContent = 'Получить код подтверждения';
+                }, 5000);
+            }
+        });
+    }
+});
+</script>
+{% endblock %}
