@@ -1,3 +1,5 @@
+<!-- /templates/base.html -->
+
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -5,10 +7,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>niktoonion</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.js"></script>
 </head>
 <body>
-    {% if request.endpoint != 'room' %}
+    {% if request.endpoint != 'room' and request.endpoint != 'direct_message' %}
     <nav class="main-nav">
         <div class="nav-container">
             <a href="{{ url_for('home') }}" class="nav-brand">NIKTOONION</a>
@@ -31,12 +32,20 @@
     
     {% if request.endpoint == 'home' %}
         <script src="{{ url_for('static', filename='home.js') }}"></script>
-    {% elif request.endpoint == 'room' %}
+    {% elif request.endpoint == 'room' or request.endpoint == 'direct_message' %}
+        <script src="https://cdn.socket.io/4.5.0/socket.io.min.js"></script>
         <script src="{{ url_for('static', filename='room.js') }}"></script>
     {% elif request.endpoint in ['auth_required', 'verify_code', 'login'] %}
         <script src="{{ url_for('static', filename='auth.js') }}"></script>
     {% elif request.endpoint == 'notifications_page' %}
         <script src="{{ url_for('static', filename='notifications.js') }}"></script>
+    {% endif %}
+    
+    <!-- Подключаем Cropper.js для обрезки аватарок -->
+    {% if request.endpoint == 'profile' %}
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.css">
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
+        <script src="{{ url_for('static', filename='avatar_editor.js') }}"></script>
     {% endif %}
 </body>
 </html>

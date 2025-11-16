@@ -1,4 +1,5 @@
 // static/auth.js
+
 document.addEventListener('DOMContentLoaded', function() {
     // Обработка отправки форм аутентификации
     const forms = document.querySelectorAll('form');

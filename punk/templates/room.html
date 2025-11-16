@@ -1,21 +1,27 @@
+<!-- /templates/room.html -->
+
+
 {% extends "base.html" %}
 {% block content %}
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+
 <div id="main">
     <script type="application/json" id="room-messages-data">
         {{ messages | tojson | safe }}
     </script>
     <div id="room-data" 
-         data-default-avatar="{{ default_avatar }}"
-         data-user-id="{{ user.id }}"
-         data-user-name="{{ user.display_name }}"
-         data-user-avatar="{{ user.avatar }}"
-         style="display: none;">
+        data-default-avatar="{{ default_avatar }}"
+        data-user-id="{{ user.id }}"
+        data-user-name="{{ user.display_name }}"
+        data-user-avatar="{{ user.avatar }}"
+        data-room-code="{{ room }}"
+        style="display: none;">
     </div>
     
     <div id="header">
         <h1>{{ title }} <small style="color: #8899a6;">({{ room }})</small></h1>
-        <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 5px;">
+        <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 5px; flex-wrap: wrap;">
             <img src="data:image/png;base64,{{ user.avatar }}" class="avatar" style="width: 24px; height: 24px;">
             <span style="color: #8899a6; font-size: 0.9em;">{{ user.display_name }}</span>
             <a href="{{ url_for('profile') }}" style="color: #19cf86; font-size: 0.8em; margin-left: 10px;">Профиль</a>
@@ -23,23 +29,33 @@
         </div>
     </div>
     
-    <div id="messages"></div>
+    <div id="messages" class="scroll-container"></div>
     
     <form id="send-container" enctype="multipart/form-data">
         <div class="editor-toolbar">
-            <button type="button" id="bold-btn"><strong>B</strong></button>
-            <button type="button" id="italic-btn"><em>I</em></button>
-            <select id="size-select">
-                <option value="">Size</option>
-                <option value="1">Small</option>
-                <option value="3">Normal</option>
-                <option value="5">Large</option>
-                <option value="7">Huge</option>
+            <button type="button" class="toolbar-button" id="bold-btn" title="Жирный"><strong>B</strong></button>
+            <button type="button" class="toolbar-button" id="italic-btn" title="Курсив"><em>I</em></button>
+            <select id="size-select" class="toolbar-button" style="border-radius: 20px; padding: 0 8px;" title="Размер текста">
+                <option value="">Размер</option>
+                <option value="1">Маленький</option>
+                <option value="3">Обычный</option>
+                <option value="5">Большой</option>
+                <option value="7">Огромный</option>
             </select>
-            <button type="button" id="emoji-btn">😊</button>
+            <button type="button" class="toolbar-button" id="emoji-btn" title="Эмодзи">😊</button>
+            
+            <!-- Twitter-style file input -->
+            <div class="file-input-container">
+                <button type="button" class="toolbar-button file-input-button" title="Прикрепить файл">
+                    📎
+                </button>
+                <input type="file" id="file-input" name="file" multiple
+                    accept="image/*,video/*,audio/*,.gif,.zip,.pdf,.txt,.doc,.docx,.xlsx,.ppt,.pptx">
+            </div>
+            
             <div id="emoji-picker" class="emoji-picker hidden">
                 <div class="emoji-picker-header">
-                    <span>Pick Emojis</span>
+                    <span>Выберите эмодзи</span>
                     <button type="button" id="close-emoji-picker" class="close-emoji">✕</button>
                 </div>
                 <div class="emoji-grid">
@@ -65,30 +81,34 @@
                     <button class="emoji">📸</button>
                 </div>
             </div>
-            <input type="file" id="file-input" name="file" multiple
-                accept="image/*,video/*,audio/*,.gif,.zip,.pdf,.txt,.doc,.docx,.xlsx,.ppt,.pptx">
         </div>
-        <div class="resizer-top"></div>
-        <div id="message-editor" contenteditable="true" data-placeholder="What's happening?"></div>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+        
+        <div class="resizer-top" title="Изменить высоту поля ввода"></div>
+        
+        <div id="message-editor" contenteditable="true" data-placeholder="Что у вас нового?"></div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
             <span id="char-counter" style="color: #8899a6; font-size: 0.8em;">0/512</span>
-            <button type="submit" id="send-button">Post</button>
+            <button type="submit" id="send-button" class="submit-button">Отправить</button>
         </div>
     </form>
     
+    <!-- Image viewer for full-size media -->
     <div id="image-viewer" class="image-viewer hidden">
         <div class="image-viewer-content">
-            <img id="viewer-image" src="" alt="Full-size image">
+            <img id="viewer-image" src="" alt="Полноразмерное изображение">
             <button id="close-viewer" class="close-button">✕</button>
         </div>
     </div>
     
+    <!-- Cooldown overlay -->
     <div id="cooldown-overlay" class="cooldown-overlay hidden">
         <div class="cooldown-timer">
-            <span id="cooldown-seconds">1</span> second until you can post again
+            <span id="cooldown-seconds">1</span> секунда до следующего сообщения
             <div class="cooldown-progress"></div>
         </div>
     </div>
+
 </div>
 
 <style>
@@ -101,8 +121,99 @@
     transition: opacity 0.2s ease;
 }
 
-.message .avatar:hover {
+.message .avatar:active {
     opacity: 0.8;
+}
+
+/* Context menu styles */
+.message-context-menu {
+    position: fixed;
+    background: #253341;
+    border: 1px solid #38444d;
+    border-radius: 12px;
+    padding: 8px 0;
+    z-index: 1000;
+    min-width: 200px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.context-menu-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    color: #d9d9d9;
+    border-bottom: 1px solid #38444d;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+.context-menu-item:last-child {
+    border-bottom: none;
+}
+
+.context-menu-item:active {
+    background: #38444d;
+}
+
+.context-menu-item.delete {
+    color: #e0245e;
+}
+
+/* Mobile optimizations */
+@media (max-width: 768px) {
+    #header {
+        padding: 10px 12px;
+    }
+    
+    #header h1 {
+        font-size: 1.2em;
+    }
+    
+    #header div {
+        gap: 8px;
+    }
+    
+    .editor-toolbar {
+        padding: 6px;
+        gap: 6px;
+    }
+    
+    .toolbar-button {
+        min-width: 40px;
+        min-height: 40px;
+        padding: 8px;
+    }
+    
+    #message-editor {
+        min-height: 100px;
+        padding: 14px;
+    }
+}
+
+@media (max-width: 480px) {
+    #header h1 {
+        font-size: 1.1em;
+    }
+    
+    .editor-toolbar {
+        gap: 4px;
+        padding: 4px;
+    }
+    
+    .toolbar-button {
+        min-width: 36px;
+        min-height: 36px;
+        padding: 6px;
+        font-size: 0.9em;
+    }
+    
+    #message-editor {
+        min-height: 80px;
+        padding: 12px;
+    }
 }
 </style>
 {% endblock %}

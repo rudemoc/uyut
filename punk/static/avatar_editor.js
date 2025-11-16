@@ -24,6 +24,7 @@ class AvatarEditor {
             avatarInput.addEventListener('change', (e) => {
                 const file = e.target.files[0];
                 if (file) {
+                    console.log('File selected:', file.name);
                     this.openCropModal(file);
                 }
             });
@@ -54,8 +55,14 @@ class AvatarEditor {
         const reader = new FileReader();
 
         reader.onload = (e) => {
+            console.log('File loaded, opening crop modal');
             cropImage.src = e.target.result;
             cropModal.classList.remove('hidden');
+            
+            // Destroy existing cropper if any
+            if (this.cropper) {
+                this.cropper.destroy();
+            }
             
             // Инициализируем Cropper.js
             this.cropper = new Cropper(cropImage, {
@@ -72,6 +79,11 @@ class AvatarEditor {
                 toggleDragModeOnDblclick: false,
                 background: false,
             });
+            console.log('Cropper initialized');
+        };
+
+        reader.onerror = (e) => {
+            console.error('Error reading file:', e);
         };
 
         reader.readAsDataURL(file);
@@ -90,11 +102,16 @@ class AvatarEditor {
         if (avatarInput) {
             avatarInput.value = '';
         }
+        console.log('Crop modal closed');
     }
 
     cropImage() {
-        if (!this.cropper) return;
+        if (!this.cropper) {
+            console.error('No cropper instance');
+            return;
+        }
 
+        console.log('Cropping image...');
         const canvas = this.cropper.getCroppedCanvas({
             width: 256,
             height: 256,
@@ -111,11 +128,45 @@ class AvatarEditor {
         const cropDataInput = document.getElementById('crop-data');
         cropDataInput.value = JSON.stringify(cropData);
 
+        console.log('Image cropped successfully, crop data:', cropData);
         this.closeCropModal();
+        
+        // Показываем уведомление
+        this.showMessage('Аватарка обрезана. Нажмите "Сохранить изменения" для применения.', 'success');
+    }
+    
+    showMessage(text, type) {
+        // Удаляем существующие сообщения
+        const existingMessages = document.querySelectorAll('.avatar-message');
+        existingMessages.forEach(msg => msg.remove());
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'avatar-message';
+        messageDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: ${type === 'success' ? '#19cf86' : '#e0245e'};
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            z-index: 10000;
+            font-weight: bold;
+        `;
+        messageDiv.textContent = text;
+        document.body.appendChild(messageDiv);
+        
+        setTimeout(() => {
+            if (document.body.contains(messageDiv)) {
+                document.body.removeChild(messageDiv);
+            }
+        }, 3000);
     }
 }
 
 // Инициализация когда DOM загружен
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('Initializing avatar editor...');
     window.avatarEditor = new AvatarEditor();
 });

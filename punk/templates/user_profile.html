@@ -19,7 +19,6 @@
                 </p>
                 
                 <div class="profile-actions" style="margin-top: 15px;">
-                    <!-- ВСЕГДА используем direct_message для гарантированного перехода в личный чат -->
                     <a href="{{ url_for('direct_message', user_id=user.id) }}" 
                        class="message-button" 
                        style="background-color: #19cf86; color: #15202b; text-decoration: none; padding: 10px 20px; border-radius: 20px; font-weight: bold; display: inline-block; transition: all 0.2s ease;">
@@ -52,8 +51,8 @@
     </div>
 
     <div class="profile-actions" style="margin-top: 30px; display: flex; gap: 10px;">
-        <a href="{{ url_for('home') }}" class="back-button">← На главную</a>
-        <a href="javascript:history.back()" class="back-button">Назад</a>
+        <a href="javascript:void(0)" onclick="goBack()" class="back-button" style="flex: 1; text-align: center;">← Назад</a>
+        <a href="{{ url_for('home') }}" class="back-button" style="flex: 1; text-align: center;">На главную</a>
     </div>
 </div>
 
@@ -93,19 +92,22 @@
 }
 
 .back-button {
+    background: #253341;
     color: #19cf86;
     text-decoration: none;
-    padding: 10px 20px;
+    padding: 12px 20px;
     border: 1px solid #38444d;
     border-radius: 20px;
     display: inline-block;
     text-align: center;
-    flex: 1;
     transition: all 0.2s ease;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 1em;
 }
 
 .back-button:hover {
-    background: #253341;
+    background: #38444d;
 }
 
 .message-button:hover {
@@ -133,4 +135,29 @@
     }
 }
 </style>
+
+<script>
+function goBack() {
+    // Пробуем получить URL из sessionStorage
+    const returnUrl = sessionStorage.getItem('return_url');
+    
+    if (returnUrl) {
+        window.location.href = returnUrl;
+    } else if (document.referrer && document.referrer.includes(window.location.host)) {
+        // Если есть реферер с того же домена
+        window.history.back();
+    } else {
+        // Если ничего нет, идем на главную
+        window.location.href = '/';
+    }
+}
+
+// Сохраняем текущий URL при загрузке страницы профиля
+document.addEventListener('DOMContentLoaded', function() {
+    // Сохраняем URL, с которого пришли, только если это не прямой переход
+    if (document.referrer && document.referrer.includes(window.location.host)) {
+        sessionStorage.setItem('return_url', document.referrer);
+    }
+});
+</script>
 {% endblock %}

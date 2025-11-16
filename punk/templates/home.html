@@ -1,55 +1,970 @@
 {% extends "base.html" %}
 {% block content %}
-<div id="main">
-    <div class="header">
-        <h1>NIKTOONION</h1>
-        <div class="user-header">
-            <img src="data:image/png;base64,{{ user.avatar }}" class="avatar" style="width: 32px; height: 32px;">
-            <span style="color: #d9d9d9;">{{ user.display_name }}</span>
-            <a href="{{ url_for('profile') }}" style="color: #19cf86; margin-left: 10px;">Профиль</a>
+<div class="home-container">
+    <!-- Хедер с статистикой -->
+    <div class="home-header">
+        <div class="header-content">
+            
         </div>
     </div>
 
-    <form id="home-form" action="/" method="post" class="form-container">
-        <div class="form-group">
-            <label>Присоединиться к комнате</label>
-            <div class="input-group">
-                <input type="text" name="code" id="code" placeholder="Код комнаты" value="{{ code or '' }}">
-                <button type="submit" name="join" id="join-button" value="join">Войти</button>
+    <!-- Основной контент -->
+    <div class="home-main">
+        <!-- Левая колонка - быстрые действия -->
+        <div class="left-column">
+            <div class="user-card">
+                <img src="data:image/png;base64,{{ user.avatar }}" class="user-avatar" alt="Аватар">
+                <div class="user-info">
+                    <h3>{{ user.display_name }}</h3>
+                    <p>@{{ user.username }}</p>
+                </div>
+                <div class="user-actions">
+                    <a href="{{ url_for('profile') }}" class="profile-link">👤 Профиль</a>
+                    <a href="{{ url_for('notifications_page') }}" class="notifications-link">🔔 Уведомления</a>
+                </div>
+            </div>
+
+            <!-- Быстрый поиск -->
+            <div class="quick-search">
+                <div class="search-header">
+                    <h3>🔍 Быстрый поиск</h3>
+                </div>
+                <div class="search-container">
+                    <input type="text" 
+                           id="room-search" 
+                           class="search-input" 
+                           placeholder="Найти комнаты..."
+                           autocomplete="off">
+                    <div id="search-results" class="search-results"></div>
+                </div>
             </div>
         </div>
 
-        <div class="form-group">
-            <label>Создать комнату</label>
-            <input type="text" name="title" id="title" placeholder="Название комнаты (необязательно)" class="title-input">
-            <label class="inline checkbox-group">
-                <input type="checkbox" name="is_public" id="is_public"> Публичная комната
-            </label>
-            <div class="input-group">
-                <button type="submit" name="create" value="create">Создать</button>
+        <!-- Центральная колонка - основные действия -->
+        <div class="center-column">
+            <!-- Карточка присоединения -->
+            <div class="action-card join-card">
+                <div class="card-header">
+                    <div class="card-icon">🚪</div>
+                    <h3>Присоединиться к комнате</h3>
+                </div>
+                <form id="join-form" class="action-form">
+                    <div class="input-group">
+                        <input type="text" 
+                               name="code" 
+                               id="code" 
+                               placeholder="Введите код комнаты"
+                               value="{{ code or '' }}"
+                               class="modern-input">
+                        <button type="submit" class="modern-btn primary-btn">
+                            <span class="btn-text">Войти</span>
+                            <span class="btn-icon">→</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Карточка создания -->
+            <div class="action-card create-card">
+                <div class="card-header">
+                    <div class="card-icon">✨</div>
+                    <h3>Создать комнату</h3>
+                </div>
+                <form id="create-form" class="action-form">
+                    <div class="input-group vertical">
+                        <input type="text" 
+                               name="title" 
+                               id="title" 
+                               placeholder="Название комнаты (необязательно)"
+                               class="modern-input">
+                        
+                        <label class="checkbox-modern">
+                            <input type="checkbox" name="is_public" id="is_public">
+                            <span class="checkmark"></span>
+                            <span class="checkbox-text">Публичная комната</span>
+                        </label>
+                        
+                        <button type="submit" class="modern-btn success-btn">
+                            <span class="btn-text">Создать комнату</span>
+                            <span class="btn-icon">➕</span>
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
 
-        {% if error %}
-        <p class="error">{{ error }}</p>
-        {% endif %}
-    </form>
+        <!-- Правая колонка - публичные комнаты -->
+        <div class="right-column">
+            <div class="rooms-card">
+                <div class="card-header">
+                    <div class="card-icon">🌐</div>
+                    <h3>Комнаты</h3>
+                    <button class="refresh-btn" id="refresh-rooms">🔄</button>
+                </div>
+                <div id="public-rooms" class="rooms-list">
+                    <div class="loading-state">Загрузка комнат...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
-    <div class="public-rooms-section">
-        <h2>Публичные комнаты</h2>
-        <div id="public-rooms" class="room-list">
-            <em>Загрузка публичных комнат…</em>
+<!-- Модальное окно для ошибок -->
+<div id="error-modal" class="modal hidden">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Ошибка</h3>
+            <button class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+            <p id="error-message"></p>
         </div>
     </div>
 </div>
 
 <style>
-.user-header {
+/* Основные стили домашней страницы */
+.home-container {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #15202b 0%, #1c2d3d 100%);
+    padding: 20px;
+}
+
+.home-header {
+    margin-bottom: 30px;
+}
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.logo {
+    font-size: 2.5em;
+    font-weight: bold;
+    background: linear-gradient(135deg, #19cf86, #1fd1a4);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin: 0;
+}
+
+.user-stats {
+    display: flex;
+    gap: 30px;
+}
+
+.stat-item {
+    text-align: center;
+}
+
+.stat-number {
+    display: block;
+    font-size: 1.8em;
+    font-weight: bold;
+    color: #19cf86;
+}
+
+.stat-label {
+    font-size: 0.9em;
+    color: #8899a6;
+}
+
+.home-main {
+    display: grid;
+    grid-template-columns: 300px 1fr 350px;
+    gap: 25px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+/* Карточка пользователя */
+.user-card {
+    background: rgba(37, 51, 65, 0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid #38444d;
+    border-radius: 20px;
+    padding: 25px;
+    margin-bottom: 25px;
+
+    justify-content: center;
+    align-items: center;
+}
+
+.user-avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    margin-bottom: 15px;
+    
+}
+
+.user-info h3 {
+    margin: 0 0 5px 0;
+    color: #d9d9d9;
+    font-size: 1.2em;
+}
+
+.user-info p {
+    margin: 0;
+    color: #8899a6;
+    font-size: 0.9em;
+}
+
+.user-actions {
+    margin-top: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.profile-link, .notifications-link {
+    padding: 10px 15px;
+    background: rgba(56, 68, 77, 0.6);
+    color: #d9d9d9;
+    text-decoration: none;
+    border-radius: 12px;
+    text-align: center;
+    transition: all 0.3s ease;
+    font-size: 0.9em;
+}
+
+.profile-link:hover, .notifications-link:hover {
+    background: #38444d;
+    transform: translateY(-2px);
+}
+
+/* Быстрый поиск */
+.quick-search {
+    background: rgba(37, 51, 65, 0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid #38444d;
+    border-radius: 20px;
+    padding: 25px;  
+}
+
+.search-header h3 {
+    margin: 0 0 15px 0;
+    color: #d9d9d9;
+    font-size: 1.1em;
+}
+
+/* Карточки действий */
+.action-card {
+    background: rgba(37, 51, 65, 0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid #38444d;
+    border-radius: 20px;
+    padding: 30px;
+    margin-bottom: 25px;
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 25px;
+}
+
+.card-icon {
+    font-size: 1.5em;
+}
+
+.card-header h3 {
+    margin: 0;
+    color: #d9d9d9;
+    font-size: 1.3em;
+}
+
+/* Формы */
+.action-form {
+    width: 100%;
+}
+
+.input-group {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+}
+
+.input-group.vertical {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 20px;
+}
+
+.modern-input {
+    flex: 1;
+    background: rgba(21, 32, 43, 0.6);
+    border: 2px solid #38444d;
+    border-radius: 15px;
+    padding: 15px 20px;
+    color: #d9d9d9;
+    font-size: 1em;
+    transition: all 0.3s ease;
+}
+
+.modern-input:focus {
+    outline: none;
+    border-color: #19cf86;
+    background: rgba(21, 32, 43, 0.8);
+}
+
+/* Кнопки */
+.modern-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 15px 25px;
+    border: none;
+    border-radius: 15px;
+    font-size: 1em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+}
+
+.primary-btn {
+    background: linear-gradient(135deg, #19cf86, #16b677);
+    color: #15202b;
+}
+
+.success-btn {
+    background: linear-gradient(135deg, #19cf86, #16b677);
+    color: #15202b;
+    width: 100%;
+    justify-content: center;
+}
+
+.modern-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(25, 207, 134, 0.3);
+}
+
+/* Чекбокс */
+.checkbox-modern {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    color: #d9d9d9;
+    font-size: 1em;
+}
+
+.checkbox-modern input {
+    display: none;
+}
+
+.checkmark {
+    width: 22px;
+    height: 22px;
+    border: 2px solid #38444d;
+    border-radius: 6px;
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.checkbox-modern input:checked + .checkmark {
+    background: #19cf86;
+    border-color: #19cf86;
+}
+
+.checkbox-modern input:checked + .checkmark::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #15202b;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+/* Список комнат */
+.rooms-card {
+    background: rgba(37, 51, 65, 0.8);
+    backdrop-filter: blur(10px);
+    border: 1px solid #38444d;
+    border-radius: 20px;
+    padding: 30px;
+    height: fit-content;
+    position: sticky;
+    top: 20px;
+}
+
+.rooms-card .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.refresh-btn {
+    background: none;
+    border: none;
+    color: #3c4247ff;
+    font-size: 1.2em;
+    cursor: pointer;
+    padding: 8px;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.refresh-btn:hover {
+    background: #2d363dff;
+    color: #d9d9d9;
+    transform: rotate(180deg);
+}
+
+.rooms-list {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.room-item {
+    background: rgba(21, 32, 43, 0.6);
+    border: 1px solid #38444d;
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 15px;
+    transition: all 0.3s ease;
+}
+
+.room-item:hover {
+    border-color: #19cf86;
+    transform: translateY(-2px);
+}
+
+.room-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+}
+
+.room-title {
+    font-weight: bold;
+    color: #d9d9d9;
+    margin: 0;
+    font-size: 1.1em;
+}
+
+.room-members {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: #19cf86;
+    font-size: 0.9em;
+    background: rgba(25, 207, 134, 0.1);
+    padding: 4px 10px;
+    border-radius: 12px;
+}
+
+.room-code {
+    
+}
+
+.join-room-btn {
+    width: 100%;
+    background: rgba(25, 207, 134, 0.1);
+    color: #19cf86;
+    border: 1px solid rgba(25, 207, 134, 0.3);
+    padding: 12px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 600;
+}
+
+.join-room-btn:hover {
+    background: #19cf86;
+    color: #15202b;
+    transform: translateY(-1px);
+}
+
+/* Модальное окно */
+.modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: #253341;
+    border-radius: 20px;
+    border: 1px solid #38444d;
+    width: 90%;
+    max-width: 400px;
+}
+
+.modal-header {
+    padding: 20px 25px;
+    border-bottom: 1px solid #38444d;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h3 {
+    margin: 0;
+    color: #d9d9d9;
+}
+
+.close-modal {
+    background: none;
+    border: none;
+    color: #8899a6;
+    font-size: 1.5em;
+    cursor: pointer;
+    padding: 0;
+    width: 30px;
+    height: 30px;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 10px;
+}
+
+.modal-body {
+    padding: 25px;
+}
+
+/* Адаптивность */
+@media (max-width: 1200px) {
+    .home-main {
+        grid-template-columns: 280px 1fr;
+    }
+    
+    .right-column {
+        grid-column: 1 / -1;
+        margin-top: 20px;
+    }
+    
+    .rooms-card {
+        position: static;
+    }
+}
+
+@media (max-width: 768px) {
+    .home-container {
+        padding: 15px;
+    }
+    
+    .home-main {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .user-stats {
+        justify-content: center;
+    }
+    
+    .left-column, .center-column, .right-column {
+        width: 100%;
+    }
+    
+    .input-group {
+        flex-direction: column;
+    }
+    
+    .modern-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .home-container {
+        padding: 10px;
+    }
+    
+    .logo {
+        font-size: 2em;
+    }
+    
+    .action-card, .user-card, .quick-search, .rooms-card {
+        padding: 20px;
+    }
+    
+    .stat-number {
+        font-size: 1.5em;
+    }
+}
+</style>
+
+<script>
+class HomeManager {
+    constructor() {
+        this.init();
+    }
+
+    init() {
+        this.setupEventListeners();
+        this.loadPublicRooms();
+        this.setupSearch();
+    }
+
+    setupEventListeners() {
+        // Форма присоединения
+        const joinForm = document.getElementById('join-form');
+        if (joinForm) {
+            joinForm.addEventListener('submit', (e) => this.handleJoin(e));
+        }
+
+        // Форма создания
+        const createForm = document.getElementById('create-form');
+        if (createForm) {
+            createForm.addEventListener('submit', (e) => this.handleCreate(e));
+        }
+
+        // Кнопка обновления комнат
+        const refreshBtn = document.getElementById('refresh-rooms');
+        if (refreshBtn) {
+            refreshBtn.addEventListener('click', () => this.loadPublicRooms());
+        }
+
+        // Закрытие модального окна
+        const closeModal = document.querySelector('.close-modal');
+        if (closeModal) {
+            closeModal.addEventListener('click', () => this.hideError());
+        }
+    }
+
+    setupSearch() {
+        const searchInput = document.getElementById('room-search');
+        const resultsContainer = document.getElementById('search-results');
+        
+        if (!searchInput || !resultsContainer) return;
+
+        let searchTimeout;
+
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            const query = e.target.value.trim();
+            
+            if (query.length < 2) {
+                resultsContainer.style.display = 'none';
+                return;
+            }
+
+            searchTimeout = setTimeout(() => {
+                this.searchRooms(query);
+            }, 300);
+        });
+
+        // Закрытие результатов при клике вне
+        document.addEventListener('click', (e) => {
+            if (!searchInput.contains(e.target) && !resultsContainer.contains(e.target)) {
+                resultsContainer.style.display = 'none';
+            }
+        });
+    }
+
+    async searchRooms(query) {
+        try {
+            const response = await fetch(`/api/search-rooms?q=${encodeURIComponent(query)}`);
+            const data = await response.json();
+            this.displaySearchResults(data.rooms || []);
+        } catch (error) {
+            console.error('Search error:', error);
+        }
+    }
+
+    displaySearchResults(rooms) {
+        const container = document.getElementById('search-results');
+        if (!container) return;
+
+        if (rooms.length === 0) {
+            container.innerHTML = '<div class="search-result-item">Ничего не найдено</div>';
+        } else {
+            container.innerHTML = rooms.map(room => `
+                <div class="search-result-item" data-code="${room.code}">
+                    <div class="search-result-content">
+                        <div class="search-result-title">${this.escapeHtml(room.title)}</div>
+                        <div class="search-result-meta">
+                            <span class="search-result-code">${room.code}</span>
+                            <span class="search-result-members">👥 ${room.members}</span>
+                        </div>
+                    </div>
+                    <button class="join-search-result" data-code="${room.code}">
+                        Присоединиться
+                    </button>
+                </div>
+            `).join('');
+
+            // Обработчики событий
+            container.querySelectorAll('.search-result-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    if (!e.target.classList.contains('join-search-result')) {
+                        this.selectRoom(item.dataset.code);
+                    }
+                });
+            });
+
+            container.querySelectorAll('.join-search-result').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.selectRoom(btn.dataset.code);
+                });
+            });
+        }
+
+        container.style.display = 'block';
+    }
+
+    selectRoom(roomCode) {
+        const codeInput = document.getElementById('code');
+        if (codeInput) {
+            codeInput.value = roomCode;
+            // Автоматически отправляем форму
+            document.getElementById('join-form').dispatchEvent(new Event('submit'));
+        }
+    }
+
+    async handleJoin(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const code = formData.get('code').trim();
+
+        if (!code) {
+            this.showError('Введите код комнаты');
+            return;
+        }
+
+        // Проверяем существование комнаты
+        try {
+            const response = await fetch(`/api/check-room?code=${encodeURIComponent(code)}`);
+            const data = await response.json();
+
+            if (data.exists) {
+                // Перенаправляем в комнату
+                window.location.href = `/room?room=${code}`;
+            } else {
+                this.showError('Комната не найдена. Проверьте код или создайте новую комнату.');
+            }
+        } catch (error) {
+            this.showError('Ошибка при проверке комнаты');
+        }
+    }
+
+    async handleCreate(e) {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const title = formData.get('title').trim();
+        const isPublic = formData.get('is_public') === 'on';
+
+        // Отправляем запрос на создание комнаты
+        try {
+            const response = await fetch('/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    'create': 'create',
+                    'title': title,
+                    'is_public': isPublic
+                })
+            });
+
+            if (response.ok) {
+                // Перенаправляем в созданную комнату
+                window.location.href = '/room';
+            } else {
+                this.showError('Ошибка при создании комнаты');
+            }
+        } catch (error) {
+            this.showError('Ошибка при создании комнаты');
+        }
+    }
+
+    async loadPublicRooms() {
+        const container = document.getElementById('public-rooms');
+        if (!container) return;
+
+        container.innerHTML = '<div class="loading-state">Загрузка комнат...</div>';
+
+        try {
+            const response = await fetch('/api/public-rooms');
+            const data = await response.json();
+            this.renderPublicRooms(data.rooms || []);
+        } catch (error) {
+            console.error('Error loading public rooms:', error);
+            container.innerHTML = '<div class="error-state">Ошибка загрузки комнат</div>';
+        }
+    }
+
+    renderPublicRooms(rooms) {
+        const container = document.getElementById('public-rooms');
+        if (!container) return;
+
+        if (!rooms.length) {
+            container.innerHTML = '<div class="empty-state">Публичных комнат пока нет. Будьте первым!</div>';
+            return;
+        }
+
+        container.innerHTML = rooms.map(room => `
+            <div class="room-item">
+            <button class="join-room-btn" data-code="${room.code}">
+                
+                    <h4 class="room-title">
+                    ${this.escapeHtml(room.title)}</h4>
+                    
+                    <div class="room-members">
+                        👥 ${room.members}
+                        присоединиться
+                    </div>
+            </button>
+                </div>
+            </div>
+        `).join('');
+
+        // Обработчики для кнопок присоединения
+        container.querySelectorAll('.join-room-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.selectRoom(btn.dataset.code);
+            });
+        });
+    }
+
+    showError(message) {
+        const modal = document.getElementById('error-modal');
+        const messageEl = document.getElementById('error-message');
+        
+        if (modal && messageEl) {
+            messageEl.textContent = message;
+            modal.classList.remove('hidden');
+        }
+    }
+
+    hideError() {
+        const modal = document.getElementById('error-modal');
+        if (modal) {
+            modal.classList.add('hidden');
+        }
+    }
+
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+}
+
+// Инициализация при загрузке
+document.addEventListener('DOMContentLoaded', function() {
+    window.homeManager = new HomeManager();
+    
+    // Авто-обновление списка комнат каждые 30 секунд
+    setInterval(() => {
+        window.homeManager.loadPublicRooms();
+    }, 30000);
+});
+</script>
+
+<!-- Стили для поиска -->
+<style>
+.search-container {
+    position: relative;
+}
+
+.search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #253341;
+    border: 1px solid #38444d;
+    border-radius: 15px;
     margin-top: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 100;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    display: none;
+}
+
+.search-result-item {
+    padding: 15px 20px;
+    border-bottom: 1px solid #38444d;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-result-item:hover {
+    background: #38444d;
+}
+
+.search-result-content {
+    flex: 1;
+    min-width: 0;
+}
+
+.search-result-title {
+    color: #d9d9d9;
+    font-weight: bold;
+    margin-bottom: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.search-result-meta {
+    display: flex;
+    gap: 15px;
+    font-size: 0.85em;
+    color: #8899a6;
+}
+
+.search-result-code {
+    font-family: 'Courier New', monospace;
+}
+
+.join-search-result {
+    background: rgba(25, 207, 134, 0.1);
+    color: #19cf86;
+    border: 1px solid rgba(25, 207, 134, 0.3);
+    padding: 8px 15px;
+    border-radius: 10px;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+}
+
+.join-search-result:hover {
+    background: #19cf86;
+    color: #15202b;
+}
+
+.loading-state, .empty-state, .error-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #8899a6;
+    font-style: italic;
 }
 </style>
 {% endblock %}

@@ -1,4 +1,3 @@
-# main.py
 import os
 import json
 import re
@@ -17,15 +16,19 @@ from PIL import Image, ImageOps
 from flask import Flask, request, render_template, redirect, url_for, session, jsonify, send_file, Response
 from flask_socketio import SocketIO, join_room, leave_room, send
 
-
 # ----- App setup -----
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "postpunksecretkey123"
+app.config['SESSION_COOKIE_MAX_SIZE'] = 4096 * 4
 socketio = SocketIO(app)
 
 # ----- Storage -----
 UPLOAD_ROOT = os.path.join(os.getcwd(), "uploads")
+AVATARS_ROOT = os.path.join(os.getcwd(), "avatars")
+THUMBNAILS_ROOT = os.path.join(os.getcwd(), "thumbnails")
 os.makedirs(UPLOAD_ROOT, exist_ok=True)
+os.makedirs(AVATARS_ROOT, exist_ok=True)
+os.makedirs(THUMBNAILS_ROOT, exist_ok=True)
 
 rooms = {}
 users = {}
@@ -41,23 +44,21 @@ USERS_FILE = "users.json"
 MAX_UPLOAD_SIZE = 400 * 1024 * 1024
 
 # ----- Конфигурация аутентификации -----
-VERIFICATION_CODE_EXPIRY = 300  # 5 минут
-SESSION_EXPIRY = 30 * 24 * 60 * 60  # 30 дней
+VERIFICATION_CODE_EXPIRY = 300
+SESSION_EXPIRY = 30 * 24 * 60 * 60
 
 # ----- Password hashing -----
 def hash_password(password):
-    """Хеширование пароля с солью"""
     salt = os.urandom(32)
     key = hashlib.pbkdf2_hmac(
         'sha256',
         password.encode('utf-8'),
         salt,
-        100000  # Количество итераций
+        100000
     )
     return salt + key
 
 def verify_password(stored_password, provided_password):
-    """Проверка пароля"""
     salt = stored_password[:32]
     stored_key = stored_password[32:]
     key = hashlib.pbkdf2_hmac(
@@ -74,7 +75,6 @@ def create_default_avatar():
     from PIL import ImageDraw, ImageFont
     draw = ImageDraw.Draw(img)
     
-    # Создаем простой аватар с инициалами
     try:
         font = ImageFont.truetype("arial.ttf", 100)
     except:
@@ -111,14 +111,16 @@ def load_rooms():
 def save_users():
     try:
         with open(USERS_FILE, "w", encoding="utf-8") as f:
-            # Конвертируем bytes в base64 для хранения
             users_to_save = {}
             for user_id, user_data in users.items():
                 user_data_copy = user_data.copy()
                 if 'password_hash' in user_data_copy and isinstance(user_data_copy['password_hash'], bytes):
                     user_data_copy['password_hash'] = base64.b64encode(user_data_copy['password_hash']).decode('utf-8')
+                if 'avatar' in user_data_copy and user_data_copy['avatar'] and len(user_data_copy['avatar']) > 10000:
+                    user_data_copy['avatar'] = 'file'
                 users_to_save[user_id] = user_data_copy
             json.dump(users_to_save, f)
+        print(f"Users saved successfully. Total users: {len(users)}")
     except Exception as e:
         print(f"[Users] Save failed: {e}")
 
@@ -128,11 +130,18 @@ def load_users():
         try:
             with open(USERS_FILE, "r", encoding="utf-8") as f:
                 users_loaded = json.load(f)
-                # Конвертируем base64 обратно в bytes
                 for user_id, user_data in users_loaded.items():
                     if 'password_hash' in user_data and isinstance(user_data['password_hash'], str):
                         user_data['password_hash'] = base64.b64decode(user_data['password_hash'])
+                    if user_data.get('avatar') == 'file':
+                        avatar_path = os.path.join(AVATARS_ROOT, f"{user_id}.png")
+                        if os.path.exists(avatar_path):
+                            with open(avatar_path, 'rb') as avatar_file:
+                                user_data['avatar'] = base64.b64encode(avatar_file.read()).decode('utf-8')
+                        else:
+                            user_data['avatar'] = default_avatar
                 users = users_loaded
+            print(f"Users loaded successfully. Total users: {len(users)}")
         except Exception as e:
             print(f"[Users] Load failed: {e}")
             users = {}
@@ -144,7 +153,6 @@ load_users()
 
 # ----- Email validation -----
 def validate_email(email):
-    """Простая валидация email"""
     if not email or '@' not in email:
         return None
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
@@ -154,7 +162,6 @@ def validate_email(email):
 
 # ----- Password validation -----
 def validate_password(password):
-    """Валидация пароля"""
     if len(password) < 6:
         return "Пароль должен содержать минимум 6 символов"
     if len(password) > 100:
@@ -166,7 +173,6 @@ def generate_verification_code():
     return str(random.randint(100000, 999999))
 
 def send_verification_email(email, code):
-    """Эмуляция отправки email"""
     print(f"[EMAIL] Код подтверждения для {email}: {code}")
     return True
 
@@ -223,43 +229,84 @@ def generate_room_code(length: int, existing_codes: list[str]) -> str:
         if code not in existing_codes:
             return code
 
-# Обновите функцию process_avatar
 def process_avatar(file, crop_data=None):
-    """Улучшенная обработка аватарки с обрезкой"""
     if not file or file.filename == '':
+        print("No file provided for avatar processing")
         return None
     
-    if file.mimetype not in ['image/png', 'image/jpeg']:
+    print(f"Processing avatar: {file.filename}, type: {file.mimetype}, size: {file.content_length}")
+    
+    if file.mimetype not in ['image/png', 'image/jpeg', 'image/gif']:
+        print(f"Unsupported file type: {file.mimetype}")
         return None
     
     try:
         img = Image.open(file)
+        print(f"Image opened: {img.size}, mode: {img.mode}")
         
-        # Конвертируем в RGB если нужно
         if img.mode != 'RGB':
+            print(f"Converting image from {img.mode} to RGB")
             img = img.convert('RGB')
         
-        # Применяем обрезку если указана
         if crop_data:
             try:
                 crop_data_dict = json.loads(crop_data)
+                print(f"Crop data: {crop_data_dict}")
                 x = crop_data_dict['x']
                 y = crop_data_dict['y'] 
                 width = crop_data_dict['width']
                 height = crop_data_dict['height']
                 img = img.crop((x, y, x + width, y + height))
+                print(f"Image cropped to: {img.size}")
             except Exception as e:
                 print(f"Crop data error: {e}")
         
-        # Создаем квадратное изображение 256x256 (высокое качество)
+        print(f"Resizing image to 256x256")
         img = ImageOps.fit(img, (256, 256), method=Image.Resampling.LANCZOS)
         
         buffer = BytesIO()
         img.save(buffer, format="PNG", quality=95)
-        return base64.b64encode(buffer.getvalue()).decode('utf-8')
+        avatar_data = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        print(f"Avatar processing successful, data length: {len(avatar_data)}")
+        return avatar_data
     except Exception as e:
         print(f"Avatar processing error: {e}")
         return None
+
+def create_thumbnail(file_path, filename):
+    """Создает миниатюру для изображений и видео"""
+    try:
+        thumb_path = os.path.join(THUMBNAILS_ROOT, f"thumb_{filename}")
+        
+        # Для изображений
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
+            img = Image.open(file_path)
+            img.thumbnail((400, 400), Image.Resampling.LANCZOS)
+            img.save(thumb_path, "JPEG", quality=60)
+            return thumb_path
+        
+        # Для видео (требуется ffmpeg, но мы просто вернем оригинал если нет)
+        elif filename.lower().endswith(('.mp4', '.avi', '.mov', '.mkv')):
+            # Здесь можно добавить создание превью для видео
+            # Пока просто возвращаем оригинальный путь
+            return file_path
+            
+    except Exception as e:
+        print(f"Thumbnail creation error: {e}")
+        return file_path
+    
+    return file_path
+
+def save_avatar_to_file(user_id, avatar_data):
+    try:
+        avatar_path = os.path.join(AVATARS_ROOT, f"{user_id}.png")
+        with open(avatar_path, 'wb') as f:
+            f.write(base64.b64decode(avatar_data))
+        print(f"Avatar saved to file: {avatar_path}")
+        return True
+    except Exception as e:
+        print(f"Error saving avatar to file: {e}")
+        return False
 
 def room_upload_dir(room_code: str) -> str:
     d = os.path.join(UPLOAD_ROOT, room_code)
@@ -274,7 +321,6 @@ def safe_filename(name: str) -> str:
 
 # ----- Time formatting helpers -----
 def time_ago(timestamp):
-    """Форматирование времени в формате 'сколько времени назад'"""
     now = time.time()
     diff = now - timestamp
     
@@ -303,7 +349,6 @@ def utility_processor():
 
 # ----- Private messaging system -----
 def create_private_room(user1_id, user2_id):
-    """Создает приватную комнату для двух пользователей"""
     room_id = f"private_{min(user1_id, user2_id)}_{max(user1_id, user2_id)}"
     
     if room_id not in rooms:
@@ -335,7 +380,6 @@ def auth_required():
         if not validated_email:
             return render_template('auth.html', error="Неверный формат email. Пример: user@example.com")
         
-        # Проверяем, не отправляли ли уже код recently
         if validated_email in verification_codes:
             last_sent = verification_codes[validated_email].get('timestamp', 0)
             if time.time() - last_sent < 60:
@@ -374,11 +418,9 @@ def verify_code():
         if len(username) < 2 or len(username) > 20:
             return render_template('verify.html', error="Имя пользователя должно быть от 2 до 20 символов")
         
-        # Проверяем, не занято ли имя пользователя
         if find_user_by_username(username):
             return render_template('verify.html', error="Это имя пользователя уже занято")
         
-        # Проверяем пароль
         password_error = validate_password(password)
         if password_error:
             return render_template('verify.html', error=password_error)
@@ -391,12 +433,10 @@ def verify_code():
         
         verification_data = verification_codes[pending_email]
         
-        # Проверка количества попыток
         if verification_data['attempts'] >= 5:
             del verification_codes[pending_email]
             return render_template('verify.html', error="Слишком много попыток, запросите новый код")
         
-        # Проверка срока действия
         if time.time() - verification_data['timestamp'] > VERIFICATION_CODE_EXPIRY:
             del verification_codes[pending_email]
             return render_template('verify.html', error="Код устарел, запросите новый")
@@ -405,19 +445,15 @@ def verify_code():
             verification_data['attempts'] += 1
             return render_template('verify.html', error="Неверный код подтверждения")
         
-        # Код верный - создаем пользователя
         user = find_user_by_email(pending_email)
         if not user:
             user = create_user(pending_email, username, password)
         else:
             return render_template('verify.html', error="Пользователь с этим email уже существует")
         
-        # Создаем сессию
         session['user_id'] = user['id']
         session['username'] = user['username']
-        session['avatar'] = user['avatar']
         
-        # Очищаем временные данные
         del verification_codes[pending_email]
         session.pop('pending_email', None)
         
@@ -439,14 +475,14 @@ def login():
         if not user:
             return render_template('login.html', error="Пользователь с таким email не найден")
         
-        # Проверяем пароль
         if not verify_password(user.get('password_hash', b''), password):
             return render_template('login.html', error="Неверный пароль")
         
-        # Создаем сессию
+        print(f"Login successful for user: {user['username']}")
+        print(f"User avatar length: {len(user.get('avatar', ''))}")
+        
         session['user_id'] = user['id']
         session['username'] = user['username']
-        session['avatar'] = user['avatar']
         
         return redirect(url_for('home'))
     
@@ -467,11 +503,9 @@ def change_password():
         new_password = request.form.get('new_password', '')
         confirm_password = request.form.get('confirm_password', '')
         
-        # Проверяем текущий пароль
         if not verify_password(user.get('password_hash', b''), current_password):
             return render_template('change_password.html', error="Неверный текущий пароль")
         
-        # Проверяем новый пароль
         password_error = validate_password(new_password)
         if password_error:
             return render_template('change_password.html', error=password_error)
@@ -479,7 +513,6 @@ def change_password():
         if new_password != confirm_password:
             return render_template('change_password.html', error="Новые пароли не совпадают")
         
-        # Обновляем пароль
         user['password_hash'] = hash_password(new_password)
         save_users()
         
@@ -487,8 +520,6 @@ def change_password():
     
     return render_template('change_password.html')
 
-
-# Обновите маршрут профиля
 @app.route('/profile', methods=['GET', 'POST'])
 @require_auth
 def profile():
@@ -505,6 +536,12 @@ def profile():
         avatar_file = request.files.get('avatar')
         crop_data = request.form.get('crop_data')
         
+        print(f"Profile update for user {user_id}:")
+        print(f"Display name: {display_name}")
+        print(f"Bio: {bio}")
+        print(f"Avatar file: {avatar_file}")
+        print(f"Crop data: {crop_data}")
+        
         if display_name:
             user['display_name'] = display_name
             session['username'] = display_name
@@ -513,19 +550,22 @@ def profile():
             user['bio'] = bio
             
         if avatar_file and avatar_file.filename:
+            print(f"Processing avatar file: {avatar_file.filename}")
             new_avatar = process_avatar(avatar_file, crop_data)
             if new_avatar:
                 user['avatar'] = new_avatar
-                session['avatar'] = user['avatar']
-                print(f"Avatar updated for user {user_id}")
+                save_avatar_to_file(user_id, new_avatar)
+                print(f"Avatar updated successfully for user {user_id}")
             else:
                 print(f"Avatar processing failed for user {user_id}")
+        else:
+            print("No avatar file provided")
         
         save_users()
+        print("User data saved successfully")
         return redirect(url_for('profile'))
     
     return render_template('profile.html', user=user)
-
 
 @app.route('/logout')
 def logout():
@@ -579,11 +619,10 @@ def home():
 @app.route('/room')
 @require_auth
 def room():
-    # Если передан параметр room, обновляем сессию
     requested_room = request.args.get('room')
     if requested_room:
         session['room'] = requested_room
-        return redirect(url_for('room'))  # Редирект без параметра
+        return redirect(url_for('room'))
     
     room_code = session.get('room')
     user_id = session.get('user_id')
@@ -604,18 +643,82 @@ def room():
         default_avatar=default_avatar,
     )
 
+# ----- Delete message endpoint -----
+@app.route('/delete_message', methods=['POST'])
+@require_auth
+def delete_message():
+    user_id = session['user_id']
+    room_code = request.json.get('room_code')
+    message_index = request.json.get('message_index')
+    message_timestamp = request.json.get('timestamp')
+    
+    print(f"Delete message request: room={room_code}, index={message_index}, user={user_id}")
+    
+    if not room_code or message_index is None or not message_timestamp:
+        return jsonify({'success': False, 'error': 'Missing parameters'})
+    
+    if room_code not in rooms:
+        print(f"Room not found: {room_code}")
+        return jsonify({'success': False, 'error': 'Room not found'})
+    
+    room_data = rooms[room_code]
+    
+    # Проверяем, что сообщение существует
+    if message_index >= len(room_data['messages']):
+        return jsonify({'success': False, 'error': 'Message not found'})
+    
+    message = room_data['messages'][message_index]
+    
+    # Проверяем права: можно удалять свои сообщения или если пользователь создатель комнаты
+    can_delete = (message.get('user_id') == user_id or 
+                  room_data.get('created_by') == user_id or
+                  room_data.get('private') and user_id in room_data.get('participants', []))
+    
+    if not can_delete:
+        return jsonify({'success': False, 'error': 'No permission to delete this message'})
+    
+    # Проверяем, что timestamp совпадает (дополнительная проверка)
+    if message.get('timestamp') != message_timestamp:
+        return jsonify({'success': False, 'error': 'Message timestamp mismatch'})
+    
+    # Удаляем сообщение
+    deleted_message = room_data['messages'].pop(message_index)
+    
+    # Если в сообщении были файлы, удаляем их с диска
+    if deleted_message.get('file'):
+        try:
+            file_path = os.path.join(UPLOAD_ROOT, room_code, deleted_message['file']['name'])
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            
+            # Удаляем миниатюру если есть
+            thumb_path = os.path.join(THUMBNAILS_ROOT, f"thumb_{deleted_message['file']['name']}")
+            if os.path.exists(thumb_path):
+                os.remove(thumb_path)
+        except Exception as e:
+            print(f"Error deleting file: {e}")
+    
+    save_rooms()
+    
+    # Отправляем событие удаления через socket.io
+    socketio.emit('message_deleted', {
+        'room_code': room_code,
+        'message_index': message_index,
+        'timestamp': message_timestamp
+    }, room=room_code)
+    
+    return jsonify({'success': True})
+
 # ----- User Profiles and Private Messages -----
 @app.route('/user/<user_id>')
 @require_auth
 def user_profile(user_id):
-    """Страница профиля пользователя"""
     current_user_id = session['user_id']
     profile_user = users.get(user_id)
     
     if not profile_user:
         return render_template('error.html', error="Пользователь не найден"), 404
     
-    # Проверяем есть ли уже приватная комната
     existing_room_id = None
     room_id = f"private_{min(current_user_id, user_id)}_{max(current_user_id, user_id)}"
     if room_id in rooms:
@@ -628,7 +731,6 @@ def user_profile(user_id):
 @app.route('/start_chat/<user_id>')
 @require_auth
 def start_private_message(user_id):
-    """Начать личный чат с пользователем"""
     current_user_id = session['user_id']
     
     if user_id not in users:
@@ -640,7 +742,6 @@ def start_private_message(user_id):
 
 @app.route('/api/user/<user_id>/avatar')
 def get_user_avatar(user_id):
-    """Получить аватар пользователя"""
     user = users.get(user_id)
     if not user:
         return "User not found", 404
@@ -655,17 +756,13 @@ def get_user_avatar(user_id):
 @app.route('/api/notifications')
 @require_auth
 def get_notifications():
-    """Получить уведомления пользователя"""
     user_id = session['user_id']
     notifications = []
     
-    # Ищем непрочитанные личные сообщения
     for room_code, room_info in rooms.items():
         if room_info.get('private') and user_id in room_info.get('participants', []):
-            # Проверяем последние сообщения
             if room_info['messages']:
                 last_message = room_info['messages'][-1]
-                # Если сообщение не от текущего пользователя и новое
                 if (last_message.get('user_id') != user_id and 
                     last_message.get('timestamp', 0) > users[user_id].get('last_notification_check', 0)):
                     
@@ -687,7 +784,6 @@ def get_notifications():
 @app.route('/api/recent-chats')
 @require_auth
 def get_recent_chats():
-    """Получить список недавних чатов"""
     user_id = session['user_id']
     recent_chats = []
     
@@ -721,14 +817,12 @@ def get_recent_chats():
                 
                 recent_chats.append(chat_data)
     
-    # Сортируем по времени последнего сообщения
     recent_chats.sort(key=lambda x: x['timestamp'], reverse=True)
     return jsonify({'chats': recent_chats})
 
 @app.route('/notifications')
 @require_auth
 def notifications_page():
-    """Страница уведомлений и чатов"""
     user_id = session['user_id']
     user = users.get(user_id)
     return render_template('notifications.html', user=user)
@@ -745,6 +839,39 @@ def api_public_rooms():
                 'members': info.get('members', 0),
             })
     return {'rooms': data}
+
+# ----- Search Rooms API -----
+@app.get('/api/search-rooms')
+def api_search_rooms():
+    query = request.args.get('q', '').strip().lower()
+    if not query or len(query) < 1:
+        return {'rooms': []}
+    
+    results = []
+    for code, info in rooms.items():
+        if info.get('public'):
+            title = info.get('title', '').lower()
+            code_lower = code.lower()
+            
+            # Ищем по названию и коду
+            if (query in title or 
+                query in code_lower or 
+                any(word in title for word in query.split())):
+                
+                results.append({
+                    'code': code,
+                    'title': info.get('title') or f'Room {code}',
+                    'members': info.get('members', 0),
+                })
+    
+    # Сортируем: сначала точные совпадения в названии, потом по коду
+    results.sort(key=lambda x: (
+        query not in x['title'].lower(),
+        query not in x['code'].lower(),
+        -x.get('members', 0)
+    ))
+    
+    return {'rooms': results[:10]}  # Ограничиваем результаты
 
 # ----- Media upload -----
 @app.post('/upload')
@@ -777,13 +904,18 @@ def upload():
     path = os.path.join(rdir, unique)
     file.save(path)
 
+    # Создаем миниатюру для изображений
+    thumbnail_path = create_thumbnail(path, unique)
+
     url = url_for('media', room=room_code, filename=unique)
+    thumb_url = url_for('media', room=room_code, filename=unique)  # Пока используем тот же URL
 
     if mimetype.startswith('video/'): 
-        meta = {'kind': 'video', 'name': unique, 'type': mimetype, 'url': url}
+        meta = {'kind': 'video', 'name': unique, 'type': mimetype, 'url': url, 'thumb_url': thumb_url}
         return jsonify(meta)
     elif mimetype.startswith('image/'):
-        return jsonify({'kind': 'image', 'name': unique, 'type': mimetype, 'url': url})
+        meta = {'kind': 'image', 'name': unique, 'type': mimetype, 'url': url, 'thumb_url': thumb_url}
+        return jsonify(meta)
     elif mimetype.startswith('audio/'):
         return jsonify({'kind': 'audio', 'name': unique, 'type': mimetype, 'url': url})
     else:
@@ -794,6 +926,14 @@ def upload():
 def media(room, filename):
     room_path = os.path.join(UPLOAD_ROOT, room)
     file_path = os.path.join(room_path, filename)
+    
+    # Проверяем, запрашивается ли миниатюра
+    thumb_request = request.args.get('thumb')
+    if thumb_request and filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp')):
+        thumb_path = os.path.join(THUMBNAILS_ROOT, f"thumb_{filename}")
+        if os.path.exists(thumb_path):
+            file_path = thumb_path
+    
     if not os.path.isfile(file_path):
         return "Not found", 404
 
@@ -869,7 +1009,6 @@ def on_message(data):
     if room_code not in rooms or not data:
         return
 
-    # Проверка длины сообщения (512 символов)
     message_text = (data.get('message') or '').strip()
     if len(message_text) > 512:
         return
@@ -898,6 +1037,22 @@ def on_message(data):
     rooms[room_code]['messages'].append(content)
     save_rooms()
 
+@socketio.on('message_deleted')
+def on_message_deleted(data):
+    room_code = data.get('room_code')
+    message_index = data.get('message_index')
+    
+    if room_code in rooms and 0 <= message_index < len(rooms[room_code]['messages']):
+        # Обновляем сообщение в комнате
+        rooms[room_code]['messages'][message_index] = {
+            "sender": "System",
+            "message": "Сообщение было удалено",
+            "avatar": None,
+            "timestamp": time.time(),
+            "deleted": True
+        }
+        save_rooms()
+
 @socketio.on('disconnect')
 def on_disconnect():
     user_id = session.get('user_id')
@@ -920,19 +1075,13 @@ def on_disconnect():
             "timestamp": time.time()
         }
         send(msg, room=room_code)
-        if rooms[room_code]['members'] <= 0:
+        if rooms[room_code]['members'] <= 0 and not rooms[room_code].get('private'):
             if not rooms[room_code].get('public'):
                 del rooms[room_code]
                 save_rooms()
 
-
-
-
-
-
 @app.template_filter('datetime')
 def format_datetime(timestamp):
-    """Фильтр для форматирования времени"""
     if not timestamp:
         return "Неизвестно"
     try:
@@ -942,7 +1091,6 @@ def format_datetime(timestamp):
 
 @app.template_filter('time_ago')
 def time_ago(timestamp):
-    """Фильтр для отображения времени в формате 'сколько времени назад'"""
     if not timestamp:
         return "давно"
     
@@ -963,11 +1111,9 @@ def time_ago(timestamp):
     else:
         return datetime.fromtimestamp(timestamp).strftime('%d.%m.%Y')
 
-
 @app.route('/quick_chat/<user_id>')
 @require_auth
 def quick_chat(user_id):
-    """Быстрый переход в чат с пользователем"""
     current_user_id = session['user_id']
     
     if user_id not in users:
@@ -976,26 +1122,18 @@ def quick_chat(user_id):
     room_id = create_private_room(current_user_id, user_id)
     session['room'] = room_id
     return redirect(url_for('room'))
-
-
 
 @app.route('/direct_message/<user_id>')
 @require_auth
 def direct_message(user_id):
-    """Гарантированный переход в личный чат с пользователем"""
     current_user_id = session['user_id']
     
     if user_id not in users:
         return render_template('error.html', error="Пользователь не найден"), 404
     
-    # Всегда создаем/получаем приватную комнату
     room_id = create_private_room(current_user_id, user_id)
     session['room'] = room_id
     return redirect(url_for('room'))
-
-
-
-
 
 # ----- Security headers -----
 @app.after_request
@@ -1004,6 +1142,18 @@ def set_security_headers(response):
     response.headers['X-Frame-Options'] = 'DENY'
     response.headers['X-XSS-Protection'] = '1; mode=block'
     return response
+
+@app.get('/api/check-room')
+def api_check_room():
+    code = request.args.get('code', '').strip()
+    if not code:
+        return jsonify({'exists': False})
+    
+    exists = code in rooms
+    print(f"Room check: {code} -> {exists}")
+    return jsonify({'exists': exists})
+
+
 
 # ----- Run -----
 if __name__ == "__main__":
