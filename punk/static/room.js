@@ -25,6 +25,10 @@ class RoomChat {
         this.cooldownOverlay = document.getElementById('cooldown-overlay');
         this.cooldownSeconds = document.getElementById('cooldown-seconds');
         this.charCounter = document.getElementById('char-counter');
+        this.messageContextMenu = null;
+        this.selectedMessage = null;
+        this.longPressTimer = null;
+        this.longPressDuration = 250; // ms
         
         // Configuration
         this.initialMessages = Array.isArray(config.initialMessages) ? config.initialMessages : [];
@@ -55,7 +59,7 @@ class RoomChat {
         this.dragStartY = 0;
         this.lastTouchX = 0;
         this.lastTouchY = 0;
-        this.ZOOM_STEP = 0.2;
+        this.ZOOM_STEP = 0.1;
         this.MAX_ZOOM = 5;
         this.MIN_ZOOM = 0.5;
 
@@ -103,6 +107,8 @@ class RoomChat {
     this.setupCharCounter();
     this.setupTouchHandlers();
     this.setupAudioPlayers(); // Добавляем инициализацию аудио плееров
+    this.setupContextMenu();
+    this.setupMessageInteractions();
     console.log('RoomChat initialized successfully');
 }
 
@@ -143,7 +149,7 @@ class RoomChat {
 
         // Start long press timer
         this.longPressTimer = setTimeout(() => {
-            this.showMessageContextMenu(e, messageElement, messageIndex);
+            
         }, this.longPressDuration);
 
         // Add visual feedback
@@ -311,30 +317,63 @@ class RoomChat {
     }
 
     setupSocketEvents() {
-        console.log('Setting up socket events...');
-        
-        this.socket.on('connect', () => {
-            console.log('[Debug] WebSocket connected successfully');
-        });
-        
-        this.socket.on('message', (msg) => {
-            console.log('[Debug] Received message:', msg);
-            this.addMessage(msg);
-        });
-        
-        this.socket.on('message_deleted', (data) => {
-            console.log('[Debug] Message deleted:', data);
-            this.handleMessageDeleted(data);
-        });
+    console.log('Setting up socket events...');
+    
+    this.socket.on('connect', () => {
+        console.log('[Debug] WebSocket connected successfully');
+    });
+    
+    this.socket.on('message', (msg) => {
+        console.log('[Debug] Received message:', msg);
+        this.addMessage(msg);
+    });
+    
+    this.socket.on('message_deleted', (data) => {
+        console.log('[Debug] Message deleted:', data);
+        this.handleMessageDeleted(data);
+    });
 
-        this.socket.on('disconnect', () => {
-            console.log('[Debug] WebSocket disconnected');
-        });
+    // Добавляем обработчик редактирования сообщения
+    this.socket.on('message_edited', (data) => {
+        console.log('[Debug] Message edited:', data);
+        this.handleMessageEdited(data);
+    });
 
-        this.socket.on('error', (error) => {
-            console.error('[Debug] WebSocket error:', error);
-        });
+    this.socket.on('disconnect', () => {
+        console.log('[Debug] WebSocket disconnected');
+    });
+
+    this.socket.on('error', (error) => {
+        console.error('[Debug] WebSocket error:', error);
+    });
+}
+
+handleMessageEdited(data) {
+    // Находим элемент сообщения по ID
+    const messageElement = this.messagesDiv.querySelector(`[data-message-id="${data.message_id}"]`);
+    if (messageElement) {
+        // Обновляем содержимое сообщения
+        const messageText = messageElement.querySelector('.message-text');
+        if (messageText) {
+            messageText.innerHTML = data.new_content;
+        }
+        
+        // Добавляем метку "ред."
+        const editLabel = messageElement.querySelector('.edit-label') || document.createElement('span');
+        if (!editLabel.classList.contains('edit-label')) {
+            editLabel.className = 'edit-label';
+            editLabel.style.cssText = 'color: #8899a6; font-size: 0.8em; margin-left: 5px; font-style: italic;';
+            editLabel.textContent = 'ред.';
+            
+            const messageHeader = messageElement.querySelector('.message-header');
+            if (messageHeader) {
+                messageHeader.appendChild(editLabel);
+            }
+        }
+        
+        this.showMessageSuccess('Сообщение обновлено');
     }
+}
 
     setupEmojiPicker() {
         if (!this.emojiPicker) return;
@@ -648,10 +687,13 @@ class RoomChat {
 
     const wasAtBottom = this.isAtBottom;
 
+
     const msgElem = document.createElement('div');
     msgElem.classList.add('message');
     msgElem.dataset.timestamp = msg.timestamp;
     msgElem.dataset.userId = msg.user_id;
+    msgElem.dataset.messageId = msg.id || msg.timestamp; // Уникальный ID сообщения
+
 
     const avatar = msg.avatar ? `data:image/png;base64,${msg.avatar}` : `data:image/png;base64,${this.defaultAvatar}`;
 
@@ -713,16 +755,19 @@ class RoomChat {
     this.messagesDiv.appendChild(msgElem);
 
     // Add context menu to the entire message
-    this.addMessageContextMenu(msgElem, msg);
+    
 
     this.attachMediaClickHandlers(payload);
     this.initializeAllAudioPlayers(); // Инициализируем аудио плееры для нового сообщения
+    this.addMessageInteractions(msgElem, msg);
 
     if (wasAtBottom && smoothScroll) {
         setTimeout(() => {
             this.scrollToBottom();
         }, 50);
     }
+
+    
 }
 
 createAudioPlayer(file) {
@@ -974,64 +1019,233 @@ formatTime(seconds) {
         }
     }
 
-    addMessageContextMenu(messageElement, msg) {
-        // Right click handler
+
+    addMessageInteractions(messageElement, msg) {
+        const isOwnMessage = msg.user_id === this.userId;
+
+        // Правый клик (десктоп)
         messageElement.addEventListener('contextmenu', (e) => {
             e.preventDefault();
-            this.showMessageContextMenu(e, messageElement, Array.from(this.messagesDiv.children).indexOf(messageElement));
+            this.showContextMenu(e, messageElement, msg, isOwnMessage);
         });
-    }
 
-    showMessageContextMenu(e, messageElement, messageIndex) {
-        // Remove existing context menu
-        if (this.currentContextMenu) {
-            this.currentContextMenu.remove();
-        }
-
-        const menu = document.createElement('div');
-        menu.className = 'message-context-menu';
+        // Долгое нажатие (мобильные)
+        let pressTimer;
         
-        // Calculate position
-        const rect = messageElement.getBoundingClientRect();
-        menu.style.left = `${rect.left + 10}px`;
-        menu.style.top = `${rect.top + 10}px`;
+        messageElement.addEventListener('touchstart', (e) => {
+            pressTimer = setTimeout(() => {
+                this.showContextMenu(e, messageElement, msg, isOwnMessage);
+            }, this.longPressDuration);
+            
+            // Добавляем визуальную обратную связь
+            messageElement.classList.add('selected');
+        }, { passive: true });
 
-        const message = this.initialMessages[messageIndex] || {};
-        const isOwnMessage = message.user_id === this.userId;
+        messageElement.addEventListener('touchend', () => {
+            clearTimeout(pressTimer);
+        });
 
-        if (isOwnMessage) {
-            const deleteOption = document.createElement('div');
-            deleteOption.className = 'context-menu-item delete';
-            deleteOption.textContent = '🗑️ Удалить сообщение';
-            deleteOption.addEventListener('click', () => {
-                this.deleteMessage(messageIndex, message.timestamp);
-                menu.remove();
-                this.currentContextMenu = null;
-            });
-            menu.appendChild(deleteOption);
+        messageElement.addEventListener('touchmove', () => {
+            clearTimeout(pressTimer);
+            messageElement.classList.remove('selected');
+        });
+
+        messageElement.addEventListener('touchcancel', () => {
+            clearTimeout(pressTimer);
+            messageElement.classList.remove('selected');
+        });
+    }
+
+    showContextMenu(e, messageElement, msg, isOwnMessage) {
+        if (!this.messageContextMenu) return;
+
+        // Сохраняем выбранное сообщение
+        this.selectedMessage = {
+            element: messageElement,
+            data: msg,
+            isOwn: isOwnMessage
+        };
+
+        // Показываем/скрываем пункты меню в зависимости от прав
+        const editItem = this.messageContextMenu.querySelector('[data-action="edit"]');
+        const deleteItem = this.messageContextMenu.querySelector('[data-action="delete"]');
+        
+        if (editItem) {
+            editItem.style.display = isOwnMessage ? 'flex' : 'none';
+        }
+        
+        if (deleteItem) {
+            deleteItem.style.display = isOwnMessage ? 'flex' : 'none';
         }
 
-        const copyOption = document.createElement('div');
-        copyOption.className = 'context-menu-item';
-        copyOption.textContent = '📋 Копировать текст';
-        copyOption.addEventListener('click', () => {
-            this.copyMessageText(message);
-            menu.remove();
-            this.currentContextMenu = null;
-        });
-        menu.appendChild(copyOption);
+        // Позиционирование для мобильных
+        if (window.innerWidth <= 768) {
+            this.messageContextMenu.style.bottom = '0';
+            this.messageContextMenu.style.top = 'auto';
+            this.messageContextMenu.style.left = '50%';
+            this.messageContextMenu.style.transform = 'translateX(-50%)';
+        } else {
+            // Позиционирование для десктопа
+            const rect = messageElement.getBoundingClientRect();
+            const menuRect = this.messageContextMenu.getBoundingClientRect();
+            
+            let left = e.clientX;
+            let top = e.clientY;
 
-        document.body.appendChild(menu);
-        this.currentContextMenu = menu;
-
-        // Auto-close after 5 seconds
-        setTimeout(() => {
-            if (this.currentContextMenu === menu) {
-                menu.remove();
-                this.currentContextMenu = null;
+            // Проверяем, чтобы меню не выходило за границы экрана
+            if (left + menuRect.width > window.innerWidth) {
+                left = window.innerWidth - menuRect.width - 10;
             }
-        }, 5000);
+            
+            if (top + menuRect.height > window.innerHeight) {
+                top = window.innerHeight - menuRect.height - 10;
+            }
+
+            this.messageContextMenu.style.left = left + 'px';
+            this.messageContextMenu.style.top = top + 'px';
+            this.messageContextMenu.style.transform = 'none';
+        }
+
+        // Показываем меню
+        this.messageContextMenu.classList.remove('hidden');
+        
+        // Блокируем прокрутку на мобильных
+        if (window.innerWidth <= 768) {
+            document.body.style.overflow = 'hidden';
+        }
+
+        // Выделяем сообщение
+        messageElement.classList.add('selected');
     }
+
+
+    hideContextMenu() {
+        if (this.messageContextMenu) {
+            this.messageContextMenu.classList.add('hidden');
+        }
+        
+        // Снимаем выделение с сообщения
+        if (this.selectedMessage) {
+            this.selectedMessage.element.classList.remove('selected');
+            this.selectedMessage = null;
+        }
+        
+        // Разблокируем прокрутку
+        document.body.style.overflow = '';
+    }
+
+
+    handleContextMenuAction(action) {
+        if (!this.selectedMessage) return;
+
+        switch (action) {
+            case 'copy':
+                this.copyMessageText(this.selectedMessage.data);
+                break;
+                
+            case 'edit':
+                this.editMessage(this.selectedMessage);
+                break;
+                
+            case 'delete':
+                this.deleteMessageFromContext();
+                break;
+                
+            case 'reply':
+                this.replyToMessage(this.selectedMessage);
+                break;
+                
+            default:
+                // Отмена или другие действия
+                break;
+        }
+        
+        this.hideContextMenu();
+    }
+
+    copyMessageText(message) {
+        const text = message.message ? message.message.replace(/<[^>]*>/g, '') : '';
+        
+        navigator.clipboard.writeText(text).then(() => {
+            this.showMessageSuccess('Текст скопирован в буфер обмена');
+        }).catch(() => {
+            // Fallback для старых браузеров
+            const textArea = document.createElement('textarea');
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            this.showMessageSuccess('Текст скопирован');
+        });
+    }
+
+    editMessage(selectedMessage) {
+        const message = selectedMessage.data;
+        const messageElement = selectedMessage.element;
+        
+        // Получаем чистый текст сообщения
+        const rawText = message.message ? message.message.replace(/<[^>]*>/g, '') : '';
+        
+        // Вставляем текст в редактор
+        if (this.editor) {
+            this.editor.innerHTML = '';
+            this.editor.focus();
+            document.execCommand('insertText', false, rawText);
+            
+            // Показываем режим редактирования
+            this.showEditMode(message);
+        }
+    }
+
+    showEditMode(message) {
+        // Изменяем кнопку отправки на "Сохранить"
+        const sendButton = document.getElementById('send-button');
+        if (sendButton) {
+            const originalText = sendButton.textContent;
+            sendButton.textContent = '💾 Сохранить';
+            sendButton.dataset.originalText = originalText;
+            sendButton.dataset.editingMessageId = message.id || message.timestamp;
+        }
+        
+        this.showMessageSuccess('Режим редактирования. Измените текст и нажмите "Сохранить"');
+    }
+
+    exitEditMode() {
+        const sendButton = document.getElementById('send-button');
+        if (sendButton && sendButton.dataset.originalText) {
+            sendButton.textContent = sendButton.dataset.originalText;
+            delete sendButton.dataset.originalText;
+            delete sendButton.dataset.editingMessageId;
+        }
+    }
+
+    deleteMessageFromContext() {
+        if (!this.selectedMessage) return;
+        
+        const messageIndex = Array.from(this.messagesDiv.children).indexOf(this.selectedMessage.element);
+        const timestamp = this.selectedMessage.data.timestamp;
+        
+        this.deleteMessage(messageIndex, timestamp);
+    }
+
+    replyToMessage(selectedMessage) {
+        const message = selectedMessage.data;
+        const sender = message.sender || 'Пользователь';
+        const preview = message.message ? message.message.replace(/<[^>]*>/g, '').substring(0, 50) + '...' : '';
+        
+        // Добавляем цитирование в редактор
+        if (this.editor) {
+            this.editor.focus();
+            const quoteText = `> Ответ на сообщение от ${sender}: ${preview}\n\n`;
+            document.execCommand('insertText', false, quoteText);
+        }
+        
+        this.showMessageSuccess(`Ответ на сообщение от ${sender}`);
+    }
+
+
+    
 
     deleteMessage(messageIndex, timestamp) {
     // ВСЕ способы получить код комнаты по порядку
@@ -1286,7 +1500,7 @@ formatTime(seconds) {
             });
         });
     }
-
+    
     scrollToBottom() {
         if (this.messagesDiv) {
             this.messagesDiv.scrollTo({
@@ -1430,15 +1644,25 @@ formatTime(seconds) {
             return;
         }
         
+        // Проверяем, находится ли редактор в режиме редактирования
+        const sendButton = document.getElementById('send-button');
+        const isEditing = sendButton && sendButton.dataset.editingMessageId;
+        
         if (messageHTML || this.uploadedFiles.length > 0) {
             const messageData = {
                 message: messageHTML,
                 files: this.uploadedFiles
             };
             
+            // Если редактируем сообщение, добавляем ID
+            if (isEditing) {
+                messageData.edit_message_id = sendButton.dataset.editingMessageId;
+            }
+            
             this.socket.emit('message', messageData);
             this.editor.innerHTML = '';
             this.uploadedFiles = [];
+            this.exitEditMode(); // Выходим из режима редактирования
             
             this.startCooldown();
             
@@ -1533,6 +1757,42 @@ formatTime(seconds) {
         this.updateTransform();
         this.updateCursor();
     }
+    setupContextMenu() {
+        this.messageContextMenu = document.getElementById('message-context-menu');
+        
+        if (!this.messageContextMenu) return;
+
+        // Обработчики для пунктов меню
+        this.messageContextMenu.querySelectorAll('.context-menu-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const action = item.dataset.action;
+                this.handleContextMenuAction(action);
+            });
+        });
+
+        // Закрытие меню при клике вне
+        document.addEventListener('click', (e) => {
+            if (!this.messageContextMenu.contains(e.target)) {
+                this.hideContextMenu();
+            }
+        });
+
+        // Закрытие меню при касании вне (мобильные)
+        document.addEventListener('touchstart', (e) => {
+            if (!this.messageContextMenu.contains(e.target)) {
+                this.hideContextMenu();
+            }
+        }, { passive: true });
+    }
+
+    setupMessageInteractions() {
+        // Обработчики будут добавляться динамически в addMessage
+    }
+    
+
+    
+
 }
 
 // Room search functionality
@@ -1750,6 +2010,186 @@ formatTime(seconds) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
+
+createImagePreview(file) {
+    const aspectClass = this.getAspectRatioClass(file);
+    return `
+        <div class="image-container ${aspectClass}" data-original-src="${file.url}">
+            <img src="${file.url}" alt="Изображение" 
+                 class="media-preview image-preview optimized-image" 
+                 loading="lazy"
+                 data-width="${file.width || ''}"
+                 data-height="${file.height || ''}"
+                 onload="this.parentElement.classList.add('image-loaded')">
+        </div>
+    `;
+}
+
+    getAspectRatioClass(file) {
+        // Если в файле есть информация о размерах, используем ее
+        if (file.width && file.height) {
+            const ratio = file.width / file.height;
+            
+            if (Math.abs(ratio - 16/9) < 0.1) return '16-9';
+            if (Math.abs(ratio - 4/3) < 0.1) return '4-3';
+            if (Math.abs(ratio - 1/1) < 0.1) return '1-1';
+            if (Math.abs(ratio - 9/16) < 0.1) return '9-16';
+            
+            // Определяем портретное или альбомное
+            return ratio > 1 ? 'landscape' : 'portrait';
+        }
+        
+        // Если информации о размерах нет, возвращаем общий класс
+        return 'auto';
+    }
+
+    // Обновляем функцию загрузки файлов для получения размеров изображений
+    async uploadFile(file) {
+        const maxSize = 400 * 1024 * 1024;
+        
+        if (file.size > maxSize) {
+            throw new Error(`Файл "${file.name}" слишком большой. Максимальный размер: 400 МБ.`);
+        }
+
+        // Для изображений получаем размеры
+        if (file.type.startsWith('image/')) {
+            try {
+                const dimensions = await this.getImageDimensions(file);
+                const fd = new FormData();
+                fd.append('file', file);
+                
+                const res = await fetch('/upload', { method: 'POST', body: fd });
+                if (!res.ok) throw new Error('Ошибка загрузки');
+                
+                const result = await res.json();
+                // Добавляем размеры в метаданные
+                result.width = dimensions.width;
+                result.height = dimensions.height;
+                
+                return result;
+            } catch (error) {
+                console.error('Error getting image dimensions:', error);
+                // Если не удалось получить размеры, загружаем без них
+                const fd = new FormData();
+                fd.append('file', file);
+                const res = await fetch('/upload', { method: 'POST', body: fd });
+                if (!res.ok) throw new Error('Ошибка загрузки');
+                return await res.json();
+            }
+        } else {
+            // Для не-изображений загружаем как обычно
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await fetch('/upload', { method: 'POST', body: fd });
+            if (!res.ok) throw new Error('Ошибка загрузки');
+            return await res.json();
+        }
+    }
+
+    getImageDimensions(file) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+            
+            img.onload = function() {
+                resolve({
+                    width: this.width,
+                    height: this.height
+                });
+                URL.revokeObjectURL(url);
+            };
+            
+            img.onerror = function() {
+                reject(new Error('Не удалось загрузить изображение для определения размеров'));
+                URL.revokeObjectURL(url);
+            };
+            
+            img.src = url;
+        });
+    }
+
+    // Обновляем функцию вставки изображений в редактор
+    async handleFileUpload(event) {
+        const files = Array.from(event.target.files);
+        if (files.length === 0) return;
+        
+        const maxSize = 400 * 1024 * 1024;
+        
+        for (const file of files) {
+            if (file.size > maxSize) {
+                alert(`Файл "${file.name}" слишком большой. Максимальный размер: 400 МБ.`);
+                this.fileInput.value = '';
+                return;
+            }
+        }
+        
+        const totalSize = files.reduce((acc, file) => acc + file.size, 0);
+        if (totalSize > maxSize) {
+            alert(`Общий размер файлов превышает 400 МБ. Выберите меньше файлов.`);
+            this.fileInput.value = '';
+            return;
+        }
+        
+        try {
+            for (const file of files) {
+                const meta = await this.uploadFile(file);
+                this.uploadedFiles.push(meta);
+                
+                let insertHtml = '';
+                const sizeInfo = `<div class="file-size">${this.formatFileSize(file.size)}</div>`;
+                
+                if (meta.kind === 'image') {
+                    // Для изображений используем уменьшенные превью
+                    insertHtml = `
+                        <div class="image-container editor-preview" data-aspect-ratio="${this.getAspectRatioClass(meta)}">
+                            <img src="${meta.url}" alt="${meta.name}" 
+                                 class="media-preview image-preview" 
+                                 loading="lazy"
+                                 style="max-width: 150px; max-height: 100px;">
+                            ${sizeInfo}
+                        </div>
+                    `;
+                } else if (meta.kind === 'video') {
+                    insertHtml = `
+                        <div class="video-container" style="position:relative; max-width:100%; margin:10px 0;">
+                            <video 
+                                src="${meta.url}" 
+                                controls 
+                                preload="metadata"
+                                controlsList="nodownload"
+                                class="media-preview video-preview"
+                                playsinline
+                                style="max-width: 250px; max-height: 150px;"
+                            >
+                                Ваш браузер не поддерживает видео.
+                            </video>
+                            ${sizeInfo}
+                        </div>
+                    `;
+                } else if (meta.kind === 'audio') {
+                    insertHtml = `<div><audio src="${meta.url}" controls preload="metadata" class="media-preview audio-preview" style="max-width: 250px;"></audio>${sizeInfo}</div>`;
+                } else if (meta.kind === 'file') {
+                    insertHtml = `<div><a href="${meta.url}" download="${meta.name}" class="file-preview">📎 ${meta.name}</a>${sizeInfo}</div>`;
+                }
+                
+                if (insertHtml && this.editor) {
+                    this.editor.focus();
+                    document.execCommand('insertHTML', false, insertHtml + ' ');
+                    if (this.charCounter) {
+                        const event = new Event('input');
+                        this.editor.dispatchEvent(event);
+                    }
+                }
+            }
+            this.fileInput.value = '';
+        } catch (err) {
+            console.log('[Upload] error', err);
+            alert(err.message || 'Ошибка загрузки');
+        }
+    }
+
+
+
 }
 
 // Initialize when DOM is loaded
@@ -1841,14 +2281,3 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 300);
     });
 });
-
-// Service worker for offline functionality (optional)
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', function() {
-        navigator.serviceWorker.register('/sw.js').then(function(registration) {
-            console.log('ServiceWorker registration successful');
-        }, function(err) {
-            console.log('ServiceWorker registration failed: ', err);
-        });
-    });
-}

@@ -24,20 +24,7 @@
                 </div>
             </div>
 
-            <!-- Быстрый поиск -->
-            <div class="quick-search">
-                <div class="search-header">
-                    <h3>🔍 Быстрый поиск</h3>
-                </div>
-                <div class="search-container">
-                    <input type="text" 
-                           id="room-search" 
-                           class="search-input" 
-                           placeholder="Найти комнаты..."
-                           autocomplete="off">
-                    <div id="search-results" class="search-results"></div>
-                </div>
-            </div>
+            
         </div>
 
         <!-- Центральная колонка - основные действия -->
@@ -62,8 +49,9 @@
                         </button>
                     </div>
                 </form>
+                
             </div>
-
+            
             <!-- Карточка создания -->
             <div class="action-card create-card">
                 <div class="card-header">
@@ -90,22 +78,39 @@
                         </button>
                     </div>
                 </form>
+
             </div>
+
+                <!-- Быстрый поиск -->
+            <div class="quick-search">
+                <div class="search-header">
+                    <h3>🔍 Быстрый поиск</h3>
+                </div>
+                <div class="search-container">
+                    <input type="text" 
+                           id="room-search" 
+                           class="search-input" 
+                           placeholder="Найти комнаты..."
+                           autocomplete="on">
+                    <div id="search-results" class="search-results"></div>
+                </div>
+            </div>
+
+            <div id="search-results-desktop" class="search-results desktop-only"></div>
         </div>
 
+        
         <!-- Правая колонка - публичные комнаты -->
         <div class="right-column">
             <div class="rooms-card">
                 <div class="card-header">
                     <div class="card-icon">🌐</div>
-                    <h3>Комнаты</h3>
-                    <button class="refresh-btn" id="refresh-rooms">🔄</button>
+                    <h3>Реклама</h3>
                 </div>
-                <div id="public-rooms" class="rooms-list">
-                    <div class="loading-state">Загрузка комнат...</div>
+                    <div class="loading-state">Здесь могла быть ваша реклама ;3</div>
                 </div>
             </div>
-        </div>
+        </div> 
     </div>
 </div>
 
@@ -123,6 +128,74 @@
 </div>
 
 <style>
+
+/* Мобильная версия домашней страницы */
+@media (max-width: 768px) {
+    .home-main {
+        grid-template-columns: 1fr;
+        gap: 15px;
+        padding: 0 10px;
+    }
+    
+    .left-column, .right-column {
+        order: 2;
+    }
+    
+    .center-column {
+        order: 1;
+    }
+    
+    .user-card {
+        text-align: center;
+        padding: 20px;
+    }
+    
+    .user-avatar {
+        width: 80px;
+        height: 80px;
+    }
+    
+    .action-card {
+        padding: 20px;
+    }
+    
+    .input-group {
+        flex-direction: column;
+    }
+    
+    .modern-btn {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .rooms-card {
+        position: static;
+        margin-top: 20px;
+    }
+}
+
+@media (max-width: 480px) {
+    .home-container {
+        padding: 10px 5px;
+    }
+    
+    .action-card, .user-card, .quick-search {
+        padding: 15px;
+    }
+    
+    .card-header {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+    }
+    
+    .search-input {
+        font-size: 16px; /* Предотвращает зум в iOS */
+    }
+}
+
+
+
 /* Основные стили домашней страницы */
 .home-container {
     min-height: 100vh;
@@ -560,7 +633,7 @@
     }
     
     .home-main {
-        grid-template-columns: 1fr;
+        grid-template-columns: 100%;
         gap: 20px;
     }
     
@@ -604,17 +677,395 @@
         font-size: 1.5em;
     }
 }
+
+
+/* Улучшенные стили для поиска комнат */
+.search-container {
+    position: relative;
+    z-index: 1000; /* Увеличиваем z-index контейнера */
+}
+
+.search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #253341;
+    border: 1px solid #38444d;
+    border-radius: 15px;
+    margin-top: 10px;
+    max-height: 300px;
+    overflow-y: auto;
+    z-index: 10000; /* Очень высокий z-index */
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    display: none;
+    
+    /* Гарантируем поверх всех элементов */
+    isolation: isolate;
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+}
+
+.search-results.active {
+    display: block;
+}
+
+.search-result-item {
+    padding: 15px 20px;
+    border-bottom: 1px solid #38444d;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    position: relative;
+    z-index: 10001;
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-result-item:hover {
+    background: #38444d;
+}
+
+/* Убедимся, что карточки имеют меньший z-index */
+.action-card, .user-card, .quick-search, .rooms-card {
+    position: relative;
+    z-index: 1; /* Низкий z-index для карточек */
+}
+
+/* Мобильная версия */
+@media (max-width: 768px) {
+    .search-results {
+        position: fixed; /* На мобильных фиксируем для надежности */
+        top: auto;
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        max-height: 50vh;
+        z-index: 10000;
+    }
+    
+    .search-container {
+        z-index: 1000;
+    }
+}
+
+
+/* Улучшенные стили для поиска комнат */
+.search-container {
+    position: relative;
+    z-index: 1000;
+}
+
+.search-results {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: #253341;
+    border: 1px solid #38444d;
+    border-radius: 15px;
+    margin-top: 10px;
+    max-height: 400px; /* Увеличиваем высоту для ПК */
+    overflow-y: auto;
+    z-index: 10000;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8); /* Более темная тень */
+    display: none;
+    
+    /* Убираем размытие */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+.search-results.active {
+    display: block;
+}
+
+.search-result-item {
+    padding: 15px 20px;
+    border-bottom: 1px solid #38444d;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start; /* Меняем на flex-start для многострочного текста */
+    gap: 15px;
+}
+
+.search-result-item:last-child {
+    border-bottom: none;
+}
+
+.search-result-item:hover {
+    background: #38444d;
+}
+
+.search-result-content {
+    flex: 1;
+    min-width: 0; /* Разрешаем сжатие */
+    overflow: visible; /* Убираем скрытие переполнения */
+}
+
+.search-result-title {
+    color: #d9d9d9;
+    font-weight: bold;
+    margin-bottom: 5px;
+    
+    /* Убираем обрезку текста на ПК */
+    white-space: normal; /* Разрешаем перенос строк */
+    overflow: visible; /* Убираем скрытие */
+    text-overflow: unset; /* Убираем многоточие */
+    word-wrap: break-word; /* Перенос длинных слов */
+    line-height: 1.4; /* Улучшаем читаемость */
+}
+
+.search-result-meta {
+    display: flex;
+    gap: 15px;
+    font-size: 0.85em;
+    color: #8899a6;
+    
+    /* Разрешаем перенос мета-информации */
+    flex-wrap: wrap;
+}
+
+.search-result-code {
+    font-family: 'Courier New', monospace;
+    background: rgba(56, 68, 77, 0.5);
+    padding: 2px 6px;
+    border-radius: 4px;
+}
+
+.search-result-members {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.search-result-actions {
+    flex-shrink: 0; /* Не даем кнопке сжиматься */
+}
+
+.join-search-result {
+    background: rgba(25, 207, 134, 0.1);
+    color: #19cf86;
+    border: 1px solid rgba(25, 207, 134, 0.3);
+    padding: 8px 15px;
+    border-radius: 10px;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap; /* Только для кнопки оставляем nowrap */
+}
+
+.join-search-result:hover {
+    background: #19cf86;
+    color: #15202b;
+}
+
+/* Overlay без размытия */
+.search-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.1); /* Полупрозрачный без размытия */
+    z-index: 9999;
+    
+    /* Убираем размытие */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+/* Стили для десктопной версии */
+@media (min-width: 769px) {
+    .search-results {
+        max-height: 500px; /* Еще больше высота на ПК */
+    }
+    
+    .search-result-item {
+        align-items: center; /* На ПК выравниваем по центру */
+    }
+    
+    .search-result-title {
+        font-size: 1em;
+        max-height: none; /* Убираем ограничение высоты */
+    }
+}
+
+/* Мобильная версия */
+@media (max-width: 768px) {
+    .search-results {
+        position: fixed;
+        top: auto;
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        max-height: 60vh;
+    }
+    
+    .search-result-item {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    
+    .search-result-actions {
+        align-self: flex-end;
+    }
+    
+    .search-result-title {
+        font-size: 1.1em;
+    }
+}
+
+/* Очень маленькие экраны */
+@media (max-width: 480px) {
+    .search-results {
+        left: 5px;
+        right: 5px;
+        bottom: 5px;
+        max-height: 70vh;
+    }
+    
+    .search-result-item {
+        padding: 12px 15px;
+    }
+    
+    .search-result-meta {
+        flex-direction: column;
+        gap: 5px;
+    }
+}
+
+
+/* Исправляем кнопку присоединения */
+.join-search-result {
+    background: rgba(25, 207, 134, 0.1);
+    color: #19cf86;
+    border: 1px solid rgba(25, 207, 134, 0.3);
+    padding: 8px 15px;
+    border-radius: 10px;
+    font-size: 0.9em;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+    /* Убедимся, что кнопка кликабельна */
+    position: relative;
+    z-index: 1;
+    pointer-events: auto;
+}
+
+.join-search-result:hover {
+    background: #19cf86;
+    color: #15202b;
+}
+
+/* Убираем размытие overlay */
+.search-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.1);
+    z-index: 9999;
+    cursor: pointer;
+    /* Убираем размытие */
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+}
+
+/* На ПК делаем результаты поиска в потоке под созданием комнаты */
+@media (min-width: 769px) {
+    .search-results {
+        position: static !important; /* Убираем абсолютное позиционирование */
+        max-height: none !important;
+        margin-top: 20px;
+        box-shadow: none;
+        border: 1px solid #38444d;
+        border-radius: 15px;
+        display: none;
+        width: 100%;
+    }
+    
+    .search-results.active {
+        display: block;
+    }
+    
+    .search-container {
+        position: static;
+    }
+    
+    /* Скрываем overlay на ПК */
+    .search-overlay {
+        display: none !important;
+    }
+    
+    /* Улучшаем отображение на ПК */
+    .search-result-item {
+        padding: 15px 20px;
+        border-bottom: 1px solid #38444d;
+    }
+    
+    .search-result-item:last-child {
+        border-bottom: none;
+    }
+    
+    .search-result-title {
+        white-space: normal;
+        overflow: visible;
+        text-overflow: unset;
+        line-height: 1.4;
+    }
+}
+
+/* На мобильных оставляем overlay */
+@media (max-width: 768px) {
+    .search-results {
+        position: fixed;
+        top: auto;
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        max-height: 60vh;
+        z-index: 10000;
+    }
+    
+    .search-overlay {
+        display: block;
+    }
+}
+
+/* Убедимся, что кнопки кликабельны на всех устройствах */
+.search-result-item,
+.join-search-result {
+    pointer-events: auto;
+    cursor: pointer;
+}
+
+/* Убираем любые запреты событий */
+.search-result-item * {
+    pointer-events: auto;
+}
+
 </style>
 
 <script>
 class HomeManager {
     constructor() {
+        this.searchOverlay = null;
         this.init();
     }
 
     init() {
         this.setupEventListeners();
-        this.loadPublicRooms();
+        this.loadPublicRooms(); // Теперь этот метод существует
         this.setupSearch();
     }
 
@@ -647,8 +1098,9 @@ class HomeManager {
     setupSearch() {
         const searchInput = document.getElementById('room-search');
         const resultsContainer = document.getElementById('search-results');
+        const desktopResultsContainer = document.getElementById('search-results-desktop');
         
-        if (!searchInput || !resultsContainer) return;
+        if (!searchInput) return;
 
         let searchTimeout;
 
@@ -657,7 +1109,7 @@ class HomeManager {
             const query = e.target.value.trim();
             
             if (query.length < 2) {
-                resultsContainer.style.display = 'none';
+                this.hideResults();
                 return;
             }
 
@@ -666,10 +1118,14 @@ class HomeManager {
             }, 300);
         });
 
-        // Закрытие результатов при клике вне
+        // Закрытие результатов при клике вне (только для мобильных)
         document.addEventListener('click', (e) => {
-            if (!searchInput.contains(e.target) && !resultsContainer.contains(e.target)) {
-                resultsContainer.style.display = 'none';
+            if (window.innerWidth <= 768) {
+                if (!searchInput.contains(e.target) && 
+                    !resultsContainer.contains(e.target) &&
+                    !this.searchOverlay?.contains(e.target)) {
+                    this.hideResults();
+                }
             }
         });
     }
@@ -685,11 +1141,20 @@ class HomeManager {
     }
 
     displaySearchResults(rooms) {
-        const container = document.getElementById('search-results');
+    const mobileContainer = document.getElementById('search-results');
+    const desktopContainer = document.getElementById('search-results-desktop');
+    
+    const renderResults = (container) => {
         if (!container) return;
-
+        
         if (rooms.length === 0) {
-            container.innerHTML = '<div class="search-result-item">Ничего не найдено</div>';
+            container.innerHTML = `
+                <div class="search-result-item no-results">
+                    <div style="text-align: center; color: #8899a6; padding: 20px;">
+                        Ничего не найдено
+                    </div>
+                </div>
+            `;
         } else {
             container.innerHTML = rooms.map(room => `
                 <div class="search-result-item" data-code="${room.code}">
@@ -706,35 +1171,203 @@ class HomeManager {
                 </div>
             `).join('');
 
-            // Обработчики событий
-            container.querySelectorAll('.search-result-item').forEach(item => {
-                item.addEventListener('click', (e) => {
-                    if (!e.target.classList.contains('join-search-result')) {
-                        this.selectRoom(item.dataset.code);
-                    }
+            // УБИРАЕМ обработчики для всей карточки, оставляем ТОЛЬКО для кнопки
+            container.querySelectorAll('.join-search-result').forEach(joinButton => {
+                const roomCode = joinButton.dataset.code;
+                
+                // Клик по кнопке присоединения
+                joinButton.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Останавливаем всплытие
+                    e.preventDefault(); // Предотвращаем действия по умолчанию
+                    this.selectRoom(roomCode);
                 });
-            });
-
-            container.querySelectorAll('.join-search-result').forEach(btn => {
-                btn.addEventListener('click', (e) => {
+                
+                // Касания для мобильных
+                joinButton.addEventListener('touchstart', (e) => {
                     e.stopPropagation();
-                    this.selectRoom(btn.dataset.code);
-                });
+                    e.preventDefault();
+                    this.selectRoom(roomCode);
+                }, { passive: false });
             });
         }
 
         container.style.display = 'block';
+        container.classList.add('active');
+    };
+
+    // Рендерим в оба контейнера
+    renderResults(mobileContainer);
+    renderResults(desktopContainer);
+    
+    // Добавляем overlay только для мобильных
+    if (window.innerWidth <= 768) {
+        this.addSearchOverlay();
+    }
+}
+
+    addSearchOverlay() {
+        this.removeSearchOverlay();
+        
+        this.searchOverlay = document.createElement('div');
+        this.searchOverlay.className = 'search-overlay';
+        this.searchOverlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.1);
+            z-index: 9999;
+            cursor: pointer;
+        `;
+        
+        document.body.appendChild(this.searchOverlay);
+        
+        // Закрываем результаты при клике на overlay
+        this.searchOverlay.addEventListener('click', () => {
+            this.hideResults();
+        });
+        
+        this.searchOverlay.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            this.hideResults();
+        }, { passive: false });
     }
 
-    selectRoom(roomCode) {
-        const codeInput = document.getElementById('code');
-        if (codeInput) {
-            codeInput.value = roomCode;
-            // Автоматически отправляем форму
-            document.getElementById('join-form').dispatchEvent(new Event('submit'));
+    removeSearchOverlay() {
+        if (this.searchOverlay) {
+            this.searchOverlay.remove();
+            this.searchOverlay = null;
         }
     }
 
+    selectRoom(roomCode) {
+        console.log('Selected room:', roomCode);
+        
+        // Сначала проверяем, существует ли комната
+        fetch(`/api/check-room?code=${encodeURIComponent(roomCode)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.exists) {
+                    // Комната существует - входим в нее
+                    window.location.href = `/room?room=${roomCode}`;
+                } else {
+                    // Комната не существует - показываем ошибку
+                    this.showError('Комната не найдена или была удалена');
+                    this.hideResults();
+                }
+            })
+            .catch(error => {
+                console.error('Error checking room:', error);
+                this.showError('Ошибка при проверке комнаты');
+            });
+        
+        this.hideResults();
+        // Очищаем поле поиска
+        const searchInput = document.getElementById('room-search');
+        if (searchInput) {
+            searchInput.value = '';
+        }
+    }
+
+    hideResults() {
+        const mobileContainer = document.getElementById('search-results');
+        const desktopContainer = document.getElementById('search-results-desktop');
+        
+        if (mobileContainer) {
+            mobileContainer.style.display = 'none';
+            mobileContainer.classList.remove('active');
+        }
+        
+        if (desktopContainer) {
+            desktopContainer.style.display = 'none';
+            desktopContainer.classList.remove('active');
+        }
+        
+        this.removeSearchOverlay();
+    }
+
+    showError(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #e0245e;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            z-index: 10000;
+            font-weight: bold;
+        `;
+        errorDiv.textContent = message;
+        document.body.appendChild(errorDiv);
+        
+        setTimeout(() => {
+            if (document.body.contains(errorDiv)) {
+                document.body.removeChild(errorDiv);
+            }
+        }, 3000);
+    }
+
+    // ДОБАВЛЯЕМ НЕДОСТАЮЩИЙ МЕТОД loadPublicRooms
+    async loadPublicRooms() {
+        const container = document.getElementById('public-rooms');
+        if (!container) return;
+
+        container.innerHTML = '<div class="loading-state">Загрузка комнат...</div>';
+
+        try {
+            const response = await fetch('/api/public-rooms');
+            const data = await response.json();
+            this.renderPublicRooms(data.rooms || []);
+        } catch (error) {
+            console.error('Error loading public rooms:', error);
+            container.innerHTML = '<div class="error-state">Ошибка загрузки комнат</div>';
+        }
+    }
+
+    // ДОБАВЛЯЕМ НЕДОСТАЮЩИЙ МЕТОД renderPublicRooms
+    renderPublicRooms(rooms) {
+    const container = document.getElementById('public-rooms');
+    if (!container) return;
+
+    if (!rooms.length) {
+        container.innerHTML = '<div class="empty-state">Публичных комнат пока нет. Будьте первым!</div>';
+        return;
+    }
+
+    container.innerHTML = rooms.map(room => `
+        <div class="room-item">
+            <div class="room-content">
+                <h4 class="room-title">${this.escapeHtml(room.title)}</h4>
+                <div class="room-meta">
+                    <span class="room-code">${room.code}</span>
+                    <span class="room-members">👥 ${room.members}</span>
+                </div>
+            </div>
+            <button class="join-room-btn" data-code="${room.code}">
+                Присоединиться
+            </button>
+        </div>
+    `).join('');
+
+    // Обработчики ТОЛЬКО для кнопок присоединения
+    container.querySelectorAll('.join-room-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            this.selectRoom(btn.dataset.code);
+        });
+        
+        // Для мобильных
+        btn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            this.selectRoom(btn.dataset.code);
+        }, { passive: false });
+    });
+}
+
+    // ДОБАВЛЯЕМ НЕДОСТАЮЩИЙ МЕТОД handleJoin
     async handleJoin(e) {
         e.preventDefault();
         const formData = new FormData(e.target);
@@ -761,6 +1394,7 @@ class HomeManager {
         }
     }
 
+    // ДОБАВЛЯЕМ НЕДОСТАЮЩИЙ МЕТОД handleCreate
     async handleCreate(e) {
         e.preventDefault();
         const formData = new FormData(e.target);
@@ -792,65 +1426,7 @@ class HomeManager {
         }
     }
 
-    async loadPublicRooms() {
-        const container = document.getElementById('public-rooms');
-        if (!container) return;
-
-        container.innerHTML = '<div class="loading-state">Загрузка комнат...</div>';
-
-        try {
-            const response = await fetch('/api/public-rooms');
-            const data = await response.json();
-            this.renderPublicRooms(data.rooms || []);
-        } catch (error) {
-            console.error('Error loading public rooms:', error);
-            container.innerHTML = '<div class="error-state">Ошибка загрузки комнат</div>';
-        }
-    }
-
-    renderPublicRooms(rooms) {
-        const container = document.getElementById('public-rooms');
-        if (!container) return;
-
-        if (!rooms.length) {
-            container.innerHTML = '<div class="empty-state">Публичных комнат пока нет. Будьте первым!</div>';
-            return;
-        }
-
-        container.innerHTML = rooms.map(room => `
-            <div class="room-item">
-            <button class="join-room-btn" data-code="${room.code}">
-                
-                    <h4 class="room-title">
-                    ${this.escapeHtml(room.title)}</h4>
-                    
-                    <div class="room-members">
-                        👥 ${room.members}
-                        присоединиться
-                    </div>
-            </button>
-                </div>
-            </div>
-        `).join('');
-
-        // Обработчики для кнопок присоединения
-        container.querySelectorAll('.join-room-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                this.selectRoom(btn.dataset.code);
-            });
-        });
-    }
-
-    showError(message) {
-        const modal = document.getElementById('error-modal');
-        const messageEl = document.getElementById('error-message');
-        
-        if (modal && messageEl) {
-            messageEl.textContent = message;
-            modal.classList.remove('hidden');
-        }
-    }
-
+    // ДОБАВЛЯЕМ НЕДОСТАЮЩИЙ МЕТОД hideError
     hideError() {
         const modal = document.getElementById('error-modal');
         if (modal) {
@@ -858,6 +1434,7 @@ class HomeManager {
         }
     }
 
+    // ДОБАВЛЯЕМ НЕДОСТАЮЩИЙ МЕТОД escapeHtml
     escapeHtml(text) {
         if (!text) return '';
         const div = document.createElement('div');
@@ -872,7 +1449,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Авто-обновление списка комнат каждые 30 секунд
     setInterval(() => {
-        window.homeManager.loadPublicRooms();
+        if (window.homeManager && window.homeManager.loadPublicRooms) {
+            window.homeManager.loadPublicRooms();
+        }
     }, 30000);
 });
 </script>
@@ -881,6 +1460,48 @@ document.addEventListener('DOMContentLoaded', function() {
 <style>
 .search-container {
     position: relative;
+}
+
+
+/* Убираем кликабельность с карточки, оставляем только на кнопке */
+.search-result-item {
+    cursor: default; /* Обычный курсор для карточки */
+    transition: background-color 0.3s ease;
+}
+
+/* При наведении на карточку - не меняем фон (или меняем слабо) */
+.search-result-item:hover {
+    background: rgba(56, 68, 77, 0.3); /* Легкое затемнение вместо полного */
+}
+
+/* Курсор указателя только на кнопке */
+.join-search-result {
+    cursor: pointer;
+    background: rgba(25, 207, 134, 0.1);
+    color: #19cf86;
+    border: 1px solid rgba(25, 207, 134, 0.3);
+    padding: 8px 15px;
+    border-radius: 10px;
+    font-size: 0.9em;
+    transition: all 0.3s ease;
+    white-space: nowrap;
+}
+
+.join-search-result:hover {
+    background: #19cf86;
+    color: #15202b;
+}
+
+/* На мобильных делаем кнопку более заметной */
+@media (max-width: 768px) {
+    .join-search-result {
+        padding: 10px 16px;
+        font-size: 1em;
+    }
+    
+    .search-result-item {
+        padding: 16px 20px;
+    }
 }
 
 .search-results {

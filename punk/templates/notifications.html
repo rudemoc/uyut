@@ -3,9 +3,11 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="notifications-container">
+    
     <div class="header">
         <h1>Уведомления и чаты</h1>
-        <p class="tagline">Ваши сообщения и активность</p>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+        <meta name="mobile-web-app-capable" content="yes">
     </div>
 
     <div class="tabs">
@@ -34,7 +36,7 @@
 
 <style>
 .notifications-container {
-    max-width: 600px;
+    max-width: 100%;
     margin: 20px auto;
     padding: 0 15px;
 }
@@ -142,18 +144,71 @@
     background: #253341;
 }
 
-@media (max-width: 800px) {
-    .notifications-container {
-        padding: 0 10px;
+
+/* Адаптивность */
+@media (max-width: 1200px) {
+    .home-main {
+        grid-template-columns: 280px 1fr;
     }
     
-    .notification-item, .chat-item {
-        padding: 12px;
+    .right-column {
+        grid-column: 1 / -1;
+        margin-top: 20px;
     }
     
-    .tab-button {
-        padding: 10px 16px;
-        font-size: 0.9em;
+    .rooms-card {
+        position: static;
+    }
+}
+
+@media (max-width: 768px) {
+    .home-container {
+        padding: 15px;
+    }
+    
+    .home-main {
+        grid-template-columns: 100%;
+        gap: 20px;
+    }
+    
+    .header-content {
+        flex-direction: column;
+        text-align: center;
+    }
+    
+    .user-stats {
+        justify-content: center;
+    }
+    
+    .left-column, .center-column, .right-column {
+        width: 100%;
+    }
+    
+    .input-group {
+        flex-direction: column;
+    }
+    
+    .modern-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+@media (max-width: 480px) {
+    .home-container {
+        padding: 10px;
+    }
+    
+    .logo {
+        font-size: 2em;
+    }
+    
+    .action-card, .user-card, .quick-search, .rooms-card {
+        padding: 20px;
+    }
+    
+    .stat-number {
+        font-size: 1.5em;
     }
 }
 </style>

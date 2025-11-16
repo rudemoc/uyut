@@ -3,6 +3,7 @@ class RoomSearch {
         this.searchInput = document.getElementById('room-search');
         this.resultsContainer = document.getElementById('search-results');
         this.searchTimeout = null;
+        this.overlay = null;
         this.init();
     }
 
@@ -17,16 +18,24 @@ class RoomSearch {
             }, { passive: true });
         }
 
-        // Close results when clicking outside
+        // Close results when clicking outside (mobile only)
         document.addEventListener('click', (e) => {
-            if (!this.searchInput?.contains(e.target) && !this.resultsContainer?.contains(e.target)) {
-                this.hideResults();
+            if (window.innerWidth <= 768) {
+                if (!this.searchInput?.contains(e.target) && 
+                    !this.resultsContainer?.contains(e.target) &&
+                    !this.overlay?.contains(e.target)) {
+                    this.hideResults();
+                }
             }
         });
 
         document.addEventListener('touchstart', (e) => {
-            if (!this.searchInput?.contains(e.target) && !this.resultsContainer?.contains(e.target)) {
-                this.hideResults();
+            if (window.innerWidth <= 768) {
+                if (!this.searchInput?.contains(e.target) && 
+                    !this.resultsContainer?.contains(e.target) &&
+                    !this.overlay?.contains(e.target)) {
+                    this.hideResults();
+                }
             }
         }, { passive: true });
     }
@@ -67,126 +76,148 @@ class RoomSearch {
     }
 
     displayResults(rooms) {
-        if (!this.resultsContainer) return;
+    if (!this.resultsContainer) return;
 
-        if (rooms.length === 0) {
-            this.resultsContainer.innerHTML = `
-                <div class="search-result-item no-results">
-                    <div style="text-align: center; color: #8899a6; padding: 20px;">
-                        Ничего не найдено
+    if (rooms.length === 0) {
+        this.resultsContainer.innerHTML = `
+            <div class="search-result-item no-results">
+                <div style="text-align: center; color: #8899a6; padding: 20px;">
+                    Ничего не найдено
+                </div>
+            </div>
+        `;
+    } else {
+        this.resultsContainer.innerHTML = rooms.map(room => `
+            <div class="search-result-item" data-code="${room.code}">
+                <div class="search-result-content">
+                    <div class="search-result-title">${this.escapeHtml(room.title)}</div>
+                    <div class="search-result-meta">
+                        <span class="search-result-code">Код: ${room.code}</span>
+                        <span class="search-result-members">👥 ${room.members} онлайн</span>
                     </div>
                 </div>
-            `;
-        } else {
-            this.resultsContainer.innerHTML = rooms.map(room => `
-                <div class="search-result-item" data-code="${room.code}">
-                    <div class="search-result-content">
-                        <div class="search-result-title">${this.escapeHtml(room.title)}</div>
-                        <div class="search-result-meta">
-                            <span class="search-result-code">Код: ${room.code}</span>
-                            <span class="search-result-members">👥 ${room.members} онлайн</span>
-                        </div>
-                    </div>
-                    <div class="search-result-actions">
-                        <button class="join-search-result" data-code="${room.code}">
-                            Присоединиться
-                        </button>
-                    </div>
+                <div class="search-result-actions">
+                    <button class="join-search-result" data-code="${room.code}">
+                        Присоединиться
+                    </button>
                 </div>
-            `).join('');
+            </div>
+        `).join('');
 
-            // Add click handlers
-            this.resultsContainer.querySelectorAll('.search-result-item').forEach(item => {
-                const joinButton = item.querySelector('.join-search-result');
-                const roomCode = item.dataset.code;
-                
-                // Click on entire item
-                item.addEventListener('click', (e) => {
-                    if (e.target !== joinButton) {
-                        this.selectRoom(roomCode);
-                    }
-                });
-                
-                // Click on join button
-                joinButton.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.selectRoom(roomCode);
-                });
-                
-                // Touch events
-                item.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    if (e.target !== joinButton) {
-                        this.selectRoom(roomCode);
-                    }
-                }, { passive: false });
-                
-                joinButton.addEventListener('touchstart', (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    this.selectRoom(roomCode);
-                }, { passive: false });
+        // УБИРАЕМ обработчики для всей карточки, оставляем ТОЛЬКО для кнопки
+        this.resultsContainer.querySelectorAll('.join-search-result').forEach(joinButton => {
+            const roomCode = joinButton.dataset.code;
+            
+            // Click on join button
+            joinButton.addEventListener('click', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                this.selectRoom(roomCode);
             });
-        }
+            
+            // Touch events
+            joinButton.addEventListener('touchstart', (e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                this.selectRoom(roomCode);
+            }, { passive: false });
+        });
+    }
 
-        this.resultsContainer.style.display = 'block';
-        this.resultsContainer.classList.add('active');
+    this.resultsContainer.style.display = 'block';
+    this.resultsContainer.classList.add('active');
+    
+    // Add overlay for mobile
+    if (window.innerWidth <= 768) {
+        this.addOverlay();
+    }
+}
+    addOverlay() {
+        this.removeOverlay();
+        
+        this.overlay = document.createElement('div');
+        this.overlay.className = 'search-overlay';
+        this.overlay.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.1);
+            z-index: 9999;
+            cursor: pointer;
+        `;
+        document.body.appendChild(this.overlay);
+        
+        this.overlay.addEventListener('click', () => {
+            this.hideResults();
+        });
+        
+        this.overlay.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            this.hideResults();
+        }, { passive: false });
+    }
+
+    removeOverlay() {
+        if (this.overlay) {
+            this.overlay.remove();
+            this.overlay = null;
+        }
     }
 
     selectRoom(roomCode) {
-    console.log('Selected room:', roomCode);
-    
-    // Сначала проверяем, существует ли комната
-    fetch(`/api/check-room?code=${encodeURIComponent(roomCode)}`)
-        .then(response => response.json())
-        .then(data => {
-            if (data.exists) {
-                // Комната существует - входим в нее
-                window.location.href = `/room?room=${roomCode}`;
-            } else {
-                // Комната не существует - показываем ошибку
-                this.showError('Комната не найдена или была удалена');
-                this.hideResults();
-            }
-        })
-        .catch(error => {
-            console.error('Error checking room:', error);
-            this.showError('Ошибка при проверке комнаты');
-        });
-    
-    this.hideResults();
-    this.searchInput.value = '';
-}
+        console.log('Selected room:', roomCode);
+        
+        fetch(`/api/check-room?code=${encodeURIComponent(roomCode)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.exists) {
+                    window.location.href = `/room?room=${roomCode}`;
+                } else {
+                    this.showError('Комната не найдена или была удалена');
+                    this.hideResults();
+                }
+            })
+            .catch(error => {
+                console.error('Error checking room:', error);
+                this.showError('Ошибка при проверке комнаты');
+            });
+        
+        this.hideResults();
+        this.searchInput.value = '';
+    }
 
-showError(message) {
-    const errorDiv = document.createElement('div');
-    errorDiv.style.cssText = `
-        position: fixed;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: #e0245e;
-        color: white;
-        padding: 12px 24px;
-        border-radius: 8px;
-        z-index: 10000;
-        font-weight: bold;
-    `;
-    errorDiv.textContent = message;
-    document.body.appendChild(errorDiv);
-    
-    setTimeout(() => {
-        if (document.body.contains(errorDiv)) {
-            document.body.removeChild(errorDiv);
-        }
-    }, 3000);
-}
+    showError(message) {
+        const errorDiv = document.createElement('div');
+        errorDiv.style.cssText = `
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #e0245e;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            z-index: 10000;
+            font-weight: bold;
+        `;
+        errorDiv.textContent = message;
+        document.body.appendChild(errorDiv);
+        
+        setTimeout(() => {
+            if (document.body.contains(errorDiv)) {
+                document.body.removeChild(errorDiv);
+            }
+        }, 3000);
+    }
 
     hideResults() {
         if (this.resultsContainer) {
             this.resultsContainer.style.display = 'none';
             this.resultsContainer.classList.remove('active');
         }
+        this.removeOverlay();
     }
 
     escapeHtml(text) {
@@ -255,6 +286,9 @@ async function fetchPublicRooms() {
         console.log('[PublicRooms] fetch error', e);
     }
 }
+
+
+
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {

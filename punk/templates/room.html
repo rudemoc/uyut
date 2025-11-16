@@ -1,12 +1,16 @@
 <!-- /templates/room.html -->
-
-
 {% extends "base.html" %}
 {% block content %}
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<div id="main" class="mobile-optimized">
+    <!-- Добавляем мобильный хедер -->
+    <div id="mobile-header" class="mobile-only">
+        <button id="mobile-menu-btn" class="mobile-menu-btn">☰</button>
+        <h1 class="mobile-title">{{ title | truncate(20) }}</h1>
+        <div class="mobile-actions">
+            <button id="mobile-scroll-down" class="mobile-action-btn">↓</button>
+        </div>
+    </div>
 
-
-<div id="main">
     <script type="application/json" id="room-messages-data">
         {{ messages | tojson | safe }}
     </script>
@@ -19,7 +23,8 @@
         style="display: none;">
     </div>
     
-    <div id="header">
+    <!-- Основной хедер скрываем на мобильных -->
+    <div id="header" class="desktop-only">
         <h1>{{ title }} <small style="color: #8899a6;">({{ room }})</small></h1>
         <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 5px; flex-wrap: wrap;">
             <img src="data:image/png;base64,{{ user.avatar }}" class="avatar" style="width: 24px; height: 24px;">
@@ -29,125 +34,410 @@
         </div>
     </div>
     
-    <div id="messages" class="scroll-container"></div>
+    <div id="messages" class="scroll-container mobile-messages"></div>
     
-    <form id="send-container" enctype="multipart/form-data">
-        <div class="editor-toolbar">
-            <button type="button" class="toolbar-button" id="bold-btn" title="Жирный"><strong>B</strong></button>
-            <button type="button" class="toolbar-button" id="italic-btn" title="Курсив"><em>I</em></button>
-            <select id="size-select" class="toolbar-button" style="border-radius: 20px; padding: 0 8px;" title="Размер текста">
+    <!-- Улучшенная форма отправки для мобильных -->
+    <form id="send-container" enctype="multipart/form-data" class="mobile-send-container">
+        <div class="mobile-toolbar-overlay hidden" id="mobile-toolbar-overlay"></div>
+        
+        <div class="editor-toolbar mobile-toolbar">
+            <button type="button" class="toolbar-button mobile-toolbar-btn" id="bold-btn" title="Жирный"><strong>B</strong></button>
+            <button type="button" class="toolbar-button mobile-toolbar-btn" id="italic-btn" title="Курсив"><em>I</em></button>
+            <select id="size-select" class="toolbar-button mobile-toolbar-btn" title="Размер текста">
                 <option value="">Размер</option>
                 <option value="1">Маленький</option>
                 <option value="3">Обычный</option>
                 <option value="5">Большой</option>
                 <option value="7">Огромный</option>
             </select>
-            <button type="button" class="toolbar-button" id="emoji-btn" title="Эмодзи">😊</button>
+            <button type="button" class="toolbar-button mobile-toolbar-btn" id="emoji-btn" title="Эмодзи">😊</button>
             
-            <!-- Twitter-style file input -->
-            <div class="file-input-container">
-                <button type="button" class="toolbar-button file-input-button" title="Прикрепить файл">
+            <!-- Улучшенный файловый инпут для мобильных -->
+            <div class="file-input-container mobile-file-input">
+                <button type="button" class="toolbar-button file-input-button mobile-toolbar-btn" title="Прикрепить файл">
                     📎
                 </button>
                 <input type="file" id="file-input" name="file" multiple
-                    accept="image/*,video/*,audio/*,.gif,.zip,.pdf,.txt,.doc,.docx,.xlsx,.ppt,.pptx">
+                    accept="image/*,video/*,audio/*,.gif,.zip,.pdf,.txt,.doc,.docx,.xlsx,.ppt,.pptx"
+                    class="mobile-file-input">
             </div>
             
-            <div id="emoji-picker" class="emoji-picker hidden">
-                <div class="emoji-picker-header">
-                    <span>Выберите эмодзи</span>
-                    <button type="button" id="close-emoji-picker" class="close-emoji">✕</button>
-                </div>
-                <div class="emoji-grid">
-                    <button class="emoji">😀</button>
-                    <button class="emoji">😂</button>
-                    <button class="emoji">😎</button>
-                    <button class="emoji">❤️</button>
-                    <button class="emoji">👍</button>
-                    <button class="emoji">👎</button>
-                    <button class="emoji">🔥</button>
-                    <button class="emoji">🎉</button>
-                    <button class="emoji">🤔</button>
-                    <button class="emoji">😢</button>
-                    <button class="emoji">😡</button>
-                    <button class="emoji">🥳</button>
-                    <button class="emoji">🚀</button>
-                    <button class="emoji">🌟</button>
-                    <button class="emoji">🍕</button>
-                    <button class="emoji">🐶</button>
-                    <button class="emoji">🐱</button>
-                    <button class="emoji">🌈</button>
-                    <button class="emoji">⚡</button>
-                    <button class="emoji">📸</button>
-                </div>
-            </div>
+            <!-- Кнопка сворачивания тулбара на мобильных -->
+            <button type="button" class="toolbar-button mobile-toolbar-btn" id="close-toolbar" style="display: none;">✕</button>
         </div>
         
-        <div class="resizer-top" title="Изменить высоту поля ввода"></div>
+        <div class="resizer-top mobile-resizer" title="Изменить высоту поля ввода"></div>
         
-        <div id="message-editor" contenteditable="true" data-placeholder="Что у вас нового?"></div>
+        <div id="message-editor" contenteditable="true" data-placeholder="Написать сообщение..." 
+             class="mobile-editor"></div>
         
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
-            <span id="char-counter" style="color: #8899a6; font-size: 0.8em;">0/512</span>
-            <button type="submit" id="send-button" class="submit-button">Отправить</button>
+        <div class="mobile-send-row">
+            <span id="char-counter" class="mobile-char-counter">0/512</span>
+            <button type="submit" id="send-button" class="submit-button mobile-send-btn">
+                <span class="desktop-only">Отправить</span>
+                <span class="mobile-only">➤</span>
+            </button>
         </div>
     </form>
     
+
+    
     <!-- Image viewer for full-size media -->
-    <div id="image-viewer" class="image-viewer hidden">
+    <div id="image-viewer" class="image-viewer hidden mobile-image-viewer">
         <div class="image-viewer-content">
-            <img id="viewer-image" src="" alt="Полноразмерное изображение">
-            <button id="close-viewer" class="close-button">✕</button>
+            <img id="viewer-image" src="" alt="Полноразмерное изображение" class="mobile-viewer-image">
+            <button id="close-viewer" class="close-button mobile-close-btn">✕</button>
         </div>
     </div>
+
+    <div id="message-context-menu" class="message-context-menu hidden">
+    <div class="context-menu-item" data-action="copy">
+        <span class="context-menu-icon">📋</span>
+        <span class="context-menu-text">Копировать текст</span>
+    </div>
+    <div class="context-menu-item" data-action="edit" style="display: none;">
+        <span class="context-menu-icon">✏️</span>
+        <span class="context-menu-text">Редактировать</span>
+    </div>
+    <div class="context-menu-item" data-action="delete" style="display: none;">
+        <span class="context-menu-icon">🗑️</span>
+        <span class="context-menu-text">Удалить</span>
+    </div>
+    <div class="context-menu-item" data-action="reply">
+        <span class="context-menu-icon">↩️</span>
+        <span class="context-menu-text">Ответить</span>
+    </div>
+    <div class="context-menu-item context-menu-cancel">
+        <span class="context-menu-text">Отмена</span>
+    </div>
+</div>
     
+
+
     <!-- Cooldown overlay -->
-    <div id="cooldown-overlay" class="cooldown-overlay hidden">
+    <div id="cooldown-overlay" class="cooldown-overlay hidden mobile-cooldown">
         <div class="cooldown-timer">
             <span id="cooldown-seconds">1</span> секунда до следующего сообщения
             <div class="cooldown-progress"></div>
         </div>
     </div>
 
+    <!-- Мобильная навигация -->
+    <div id="mobile-nav" class="mobile-nav hidden">
+        <div class="mobile-nav-content">
+            <a href="{{ url_for('home') }}" class="mobile-nav-item">🏠 Главная</a>
+            <a href="{{ url_for('notifications_page') }}" class="mobile-nav-item">🔔 Уведомления</a>
+            <a href="{{ url_for('profile') }}" class="mobile-nav-item">👤 Профиль</a>
+            <div class="mobile-nav-item mobile-nav-close">✕ Закрыть</div>
+        </div>
+    </div>
 </div>
 
 <style>
-#char-counter {
+/* Мобильные стили */
+.mobile-only { display: none; }
+.desktop-only { display: block; }
+
+/* Мобильный хедер */
+#mobile-header {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: var(--primary-bg);
+    border-bottom: 1px solid var(--border-color);
+    padding: 12px 15px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+.mobile-menu-btn {
+    background: none;
+    border: none;
+    color: var(--text-primary);
+    font-size: 1.4em;
+    padding: 8px;
+    border-radius: 8px;
+}
+
+.mobile-title {
+    margin: 0;
+    font-size: 1.1em;
+    color: var(--text-primary);
+    text-align: center;
+    flex: 1;
     padding: 0 10px;
 }
 
-.message .avatar {
-    cursor: pointer;
-    transition: opacity 0.2s ease;
+.mobile-action-btn {
+    background: var(--secondary-bg);
+    border: none;
+    color: var(--text-primary);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
-.message .avatar:active {
-    opacity: 0.8;
+/* Сообщения для мобильных */
+.mobile-messages {
+    padding-bottom: 80px; /* Место для поля ввода */
 }
 
-/* Context menu styles */
-.message-context-menu {
+/* Поле ввода для мобильных */
+.mobile-send-container {
     position: fixed;
-    background: #253341;
-    border: 1px solid #38444d;
-    border-radius: 12px;
-    padding: 8px 0;
-    z-index: 1000;
-    min-width: 200px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--primary-bg);
+    border-top: 1px solid var(--border-color);
+    padding: 10px 12px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
 }
 
-.context-menu-item {
-    padding: 12px 16px;
-    cursor: pointer;
-    color: #d9d9d9;
-    border-bottom: 1px solid #38444d;
+.mobile-editor {
+    min-height: 44px;
+    max-height: 30vh;
+    font-size: 16px; /* Предотвращает зум в iOS */
+}
+
+.mobile-send-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+}
+
+.mobile-send-btn {
+    min-width: 50px;
+    min-height: 44px;
+    border-radius: 50%;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.mobile-char-counter {
+    font-size: 0.75em;
+    color: var(--text-secondary);
+}
+
+/* Тулубар для мобильных */
+.mobile-toolbar {
+    position: relative;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.mobile-toolbar::-webkit-scrollbar {
+    display: none;
+}
+
+.mobile-toolbar-btn {
+    flex-shrink: 0;
+    min-width: 44px;
+    min-height: 44px;
+}
+
+/* Мобильное контекстное меню */
+.mobile-context-menu {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: var(--secondary-bg);
+    border-radius: 16px 16px 0 0;
+    z-index: 2000;
+    padding: 20px 0;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.mobile-context-menu .context-menu-item {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 1.1em;
+    -webkit-tap-highlight-color: transparent;
+}
+
+.context-menu-cancel {
+    color: var(--error);
+    font-weight: bold;
+    margin-top: 10px;
+    border-top: 1px solid var(--border-color);
+    border-bottom: none !important;
+}
+
+/* Мобильная навигация */
+.mobile-nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 3000;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+
+.mobile-nav-content {
+    background: var(--secondary-bg);
+    border-radius: 20px 20px 0 0;
+    padding: 30px 20px;
+}
+
+.mobile-nav-item {
+    display: block;
+    padding: 18px 20px;
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 1.2em;
+    border-bottom: 1px solid var(--border-color);
+    -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-nav-close {
+    color: var(--error);
+    font-weight: bold;
+    margin-top: 20px;
+    border-top: 2px solid var(--border-color);
+    border-bottom: none !important;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .mobile-only { display: flex; }
+    .desktop-only { display: none; }
+    
+    #header { display: none; }
+    
+    .message {
+        padding: 12px 15px;
+        margin-bottom: 15px;
+    }
+    
+    .avatar {
+        width: 38px;
+        height: 38px;
+    }
+    
+    .media-preview {
+        max-width: 100%;
+    }
+    
+    .audio-container, .video-container {
+        max-width: 100%;
+    }
+}
+
+@media (max-width: 480px) {
+    .mobile-title {
+        font-size: 1em;
+    }
+    
+    .message {
+        padding: 10px 12px;
+        gap: 8px;
+    }
+    
+    .avatar {
+        width: 34px;
+        height: 34px;
+    }
+    
+    .mobile-send-container {
+        padding: 8px 10px;
+        padding-bottom: max(10px, env(safe-area-inset-bottom));
+    }
+    
+    .mobile-toolbar-btn {
+        min-width: 40px;
+        min-height: 40px;
+        padding: 6px;
+    }
+}
+
+/* Безопасные зоны для iPhone X и новее */
+@supports(padding: max(0px)) {
+    .mobile-send-container {
+        padding-left: max(10px, env(safe-area-inset-left));
+        padding-right: max(10px, env(safe-area-inset-right));
+    }
+    
+    #mobile-header {
+        padding-left: max(15px, env(safe-area-inset-left));
+        padding-right: max(15px, env(safe-area-inset-right));
+    }
+}
+
+/* Улучшения для касаний */
+@media (hover: none) and (pointer: coarse) {
+    .message:hover {
+        background: transparent;
+    }
+    
+    .message:active {
+        background: rgba(37, 51, 65, 0.3);
+    }
+    
+    .toolbar-button:active {
+        transform: scale(0.95);
+    }
+}
+
+/* Предотвращение выделения текста при касании */
+.mobile-context-menu, .mobile-nav, .mobile-toolbar-btn {
     -webkit-user-select: none;
     -moz-user-select: none;
     -ms-user-select: none;
     user-select: none;
+}
+
+/* Улучшенный скроллбар для мобильных */
+.mobile-messages::-webkit-scrollbar {
+    width: 3px;
+}
+
+.mobile-messages::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+}
+
+
+/* Стили для контекстного меню сообщений */
+.message-context-menu {
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 400px;
+    background: var(--secondary-bg);
+    border-radius: 16px 16px 0 0;
+    z-index: 2000;
+    box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.5);
+    padding: 10px 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    padding: 16px 20px;
+    color: var(--text-primary);
+    cursor: pointer;
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .context-menu-item:last-child {
@@ -155,65 +445,137 @@
 }
 
 .context-menu-item:active {
-    background: #38444d;
+    background: var(--border-color);
 }
 
-.context-menu-item.delete {
-    color: #e0245e;
+.context-menu-icon {
+    margin-right: 12px;
+    font-size: 1.2em;
+    width: 24px;
+    text-align: center;
 }
 
-/* Mobile optimizations */
-@media (max-width: 768px) {
-    #header {
-        padding: 10px 12px;
+.context-menu-text {
+    flex: 1;
+    font-size: 1.1em;
+}
+
+.context-menu-cancel {
+    color: var(--error);
+    font-weight: bold;
+    margin-top: 8px;
+    border-top: 2px solid var(--border-color);
+}
+
+/* Выделение сообщения при долгом нажатии */
+.message.selected {
+    background: rgba(56, 68, 77, 0.3);
+    border-radius: 12px;
+}
+
+/* Для десктопной версии */
+@media (min-width: 769px) {
+    .message-context-menu {
+        bottom: auto;
+        top: 0;
+        left: 0;
+        transform: none;
+        width: auto;
+        max-width: 250px;
+        border-radius: 12px;
+        padding: 8px 0;
     }
     
-    #header h1 {
-        font-size: 1.2em;
-    }
-    
-    #header div {
-        gap: 8px;
-    }
-    
-    .editor-toolbar {
-        padding: 6px;
-        gap: 6px;
-    }
-    
-    .toolbar-button {
-        min-width: 40px;
-        min-height: 40px;
-        padding: 8px;
-    }
-    
-    #message-editor {
-        min-height: 100px;
-        padding: 14px;
+    .context-menu-item {
+        padding: 12px 16px;
+        font-size: 0.95em;
     }
 }
 
-@media (max-width: 480px) {
-    #header h1 {
-        font-size: 1.1em;
-    }
-    
-    .editor-toolbar {
-        gap: 4px;
-        padding: 4px;
-    }
-    
-    .toolbar-button {
-        min-width: 36px;
-        min-height: 36px;
-        padding: 6px;
-        font-size: 0.9em;
-    }
-    
-    #message-editor {
-        min-height: 80px;
-        padding: 12px;
-    }
-}
 </style>
+
+<script>
+// Мобильные обработчики для room.js
+document.addEventListener('DOMContentLoaded', function() {
+    // Инициализация мобильного интерфейса
+    initMobileInterface();
+});
+
+function initMobileInterface() {
+    // Обработчик мобильного меню
+    const menuBtn = document.getElementById('mobile-menu-btn');
+    const mobileNav = document.getElementById('mobile-nav');
+    
+    if (menuBtn && mobileNav) {
+        menuBtn.addEventListener('click', () => {
+            mobileNav.classList.remove('hidden');
+        });
+        
+        // Закрытие меню
+        mobileNav.addEventListener('click', (e) => {
+            if (e.target.classList.contains('mobile-nav-close') || 
+                e.target.classList.contains('mobile-nav')) {
+                mobileNav.classList.add('hidden');
+            }
+        });
+    }
+    
+    // Кнопка прокрутки вниз
+    const scrollDownBtn = document.getElementById('mobile-scroll-down');
+    if (scrollDownBtn) {
+        scrollDownBtn.addEventListener('click', () => {
+            window.roomChat?.scrollToBottom();
+        });
+    }
+    
+    // Улучшенное контекстное меню для мобильных
+    setupMobileContextMenu();
+    
+    // Оптимизация касаний
+    setupTouchOptimizations();
+}
+
+function setupMobileContextMenu() {
+    const contextMenu = document.getElementById('mobile-context-menu');
+    
+    // Долгое нажатие на сообщение
+    document.addEventListener('touchstart', function(e) {
+        const message = e.target.closest('.message');
+        if (message && window.roomChat) {
+            window.roomChat.handleMessageTouchStart(e);
+        }
+    });
+    
+    document.addEventListener('touchend', function(e) {
+        window.roomChat?.handleMessageTouchEnd(e);
+    });
+}
+
+function setupTouchOptimizations() {
+    // Предотвращение двойного тапа для зума
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', function(event) {
+        const now = (new Date()).getTime();
+        if (now - lastTouchEnd <= 300) {
+            event.preventDefault();
+        }
+        lastTouchEnd = now;
+    }, false);
+    
+    // Улучшенная обработка касаний для кнопок
+    document.addEventListener('touchstart', function(e) {
+        if (e.target.classList.contains('toolbar-button') || 
+            e.target.classList.contains('mobile-action-btn')) {
+            e.target.style.transform = 'scale(0.95)';
+        }
+    });
+    
+    document.addEventListener('touchend', function(e) {
+        if (e.target.classList.contains('toolbar-button') || 
+            e.target.classList.contains('mobile-action-btn')) {
+            e.target.style.transform = 'scale(1)';
+        }
+    });
+}
+</script>
 {% endblock %}
